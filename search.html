@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="fr" data-fr-scheme="system">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Annuaire de la DNE - Recherche</title>
+
+    <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+
+    <!-- DSFR -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@gouvfr/dsfr@1.13.1/dist/dsfr/dsfr.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@gouvfr/dsfr@1.13.1/dist/utility/icons/icons.min.css">
+    <link rel="stylesheet" href="./style.css">
+</head>
+
+<body>
+
+    <!-- EN-TÊTE -->
+    <header role="banner" class="fr-header">
+        <div class="fr-header__body">
+            <div class="fr-container">
+                <div class="fr-header__body-row">
+                    <div class="fr-header__brand fr-enlarge-link">
+                        <div class="fr-header__brand-top">
+                            <div class="fr-header__logo">
+                                <p class="fr-logo">République<br>Française</p>
+                            </div>
+                        </div>
+                        <div class="fr-header__service">
+                            <a href="index.html" title="Retour à l'accueil">
+                                <p class="fr-header__service-title">Organigramme du SAAM</p>
+                            </a>
+                            <p class="fr-header__service-tagline">Annuaire et Recherche</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="fr-container fr-mt-4w fr-mb-4w">
+
+        <!-- CONTENEUR CENTRÉ -->
+        <div class="fr-grid-row fr-grid-row--center">
+            <div class="fr-col-12 fr-col-md-10 fr-col-lg-8">
+
+                <div class="fr-mb-2w">
+                    <!-- Bouton Retour -->
+                    <a href="index.html"
+                        class="fr-btn fr-btn--secondary fr-btn--icon-left fr-icon-arrow-left-line fr-mb-2w">
+                        Retour à l'organigramme
+                    </a>
+
+                    <div class="fr-mb-2w">
+                        <h1 class="fr-h4 fr-mb-1v" id="page-title">Moteur de recherche</h1>
+                        <p class="fr-text--sm fr-text--mention-grey fr-mb-0" id="page-desc">
+                            Recherchez un agent ou un bureau.
+                        </p>
+                    </div>
+
+                    <!-- BARRE DE RECHERCHE (Filtres) -->
+                    <div class="fr-grid-row fr-grid-row--gutters fr-mb-4w" style="align-items: flex-end;">
+                        <!-- Select Service -->
+                        <div class="fr-col-12 fr-col-md-6">
+                            <div class="fr-select-group">
+                                <label class="fr-label" for="select-structure">Filtrer par bureau</label>
+                                <select class="fr-select" id="select-structure" name="select-structure">
+                                    <option value="">Tous les bureaux</option>
+                                </select>
+                            </div>
+                        </div>
+                        <!-- Input Texte -->
+                        <div class="fr-col-12 fr-col-md-6">
+                            <div class="fr-search-bar" role="search">
+                                <label class="fr-label" for="searchInput">Rechercher</label>
+                                <input class="fr-input" placeholder="Nom, Prénom, Fonction..." type="search"
+                                    id="searchInput">
+                                <button class="fr-btn" id="searchBtn">Rechercher</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Loader -->
+                    <div id="loadingMessage" class="fr-alert fr-alert--info fr-mb-2w" style="display:none;">
+                        <h3 class="fr-alert__title">Chargement des données...</h3>
+                    </div>
+
+                    <!-- RÉSULTATS -->
+                    <div id="resultArea"></div>
+
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- SCRIPTS -->
+    <script src="https://cdn.jsdelivr.net/npm/@gouvfr/dsfr@1.13.1/dist/dsfr/dsfr.module.min.js" type="module"></script>
+    <script src="./map.js"></script>
+    <script src="./search.js"></script>
+
+</body>
+
+</html>

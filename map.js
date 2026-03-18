@@ -7,20 +7,20 @@
  */
 
 // ======================
-// 📌 NOMS DES TABLES
+// NOMS DES TABLES
 // ======================
 const TABLE_AGENTS = 'Base_Agent';          // Table contenant les agents
 const TABLE_STRUCTURES = 'Structures';      // Table contenant les structures
 const TABLE_CONFIG_LOGO = 'Config_Logo';    // Table de configuration du logo
 
 // ======================
-// 📌 CONFIGURATION LOGO
+//  CONFIGURATION LOGO
 // ======================
 const COL_CONFIG_TEXTE_LOGO = 'Texte_Logo';   // Texte affiché dans le logo
 const COL_CONFIG_MASQUER_LOGO = 'Masquer_Logo'; // Permet de cacher le logo
 
 // ======================
-// 📌 COLONNES AGENTS (ANNUAIRE)
+//  COLONNES AGENTS (ANNUAIRE)
 // ======================
 const COL_AGENT_NOM = 'Nom_d_usage_de_l_agent'; // Nom de famille
 const COL_AGENT_PRENOM = 'Prenom';              // Prénom
