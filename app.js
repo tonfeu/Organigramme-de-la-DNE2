@@ -405,7 +405,7 @@ window.openModalForStructure = function (structId) {
 
     // Ouverture via DSFR
     document.getElementById('dsfr-hidden-modal-btn').click();
-};
+
 
 // ==========================================
 // UTILITAIRES
