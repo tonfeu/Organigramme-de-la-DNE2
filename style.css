@@ -28,7 +28,7 @@
 /* --- GRILLE PRINCIPALE (5 COLONNES) --- */
 .main-grid {
     display: grid;
-    grid-template-columns: repeat(5, minmax(250px, 1fr)); /* colonnes au moins 200px */
+    grid-template-columns: repeat(5, minmax(200px, 1fr)); /* colonnes au moins 200px */
     gap: 1.5rem;
     align-items: start;
 }
