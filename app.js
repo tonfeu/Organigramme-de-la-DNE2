@@ -268,6 +268,32 @@ window.openModalForStructure = function (structId) {
         );
     }
 
+    // 2. Liste des agents de la structure
+const agentsOfStruct = allAgents.filter(a =>
+    window.safeStr(a[COL_AGENT_STRUCTURE]) === window.safeStr(struct[COL_STRUCT_CODE])
+);
+
+if (agentsOfStruct.length > 0) {
+    htmlContent += `
+    <div class="fr-mt-3w">
+        <h4>👥 Équipe</h4>
+        <ul class="fr-list">
+            ${agentsOfStruct.map(agent => {
+                const nom = window.safeHtml(agent._fullname || "");
+                const fonction = window.safeHtml(agent[COL_AGENT_FONCTION] || "");
+                return `<li><strong>${nom}</strong> - ${fonction}</li>`;
+            }).join("")}
+        </ul>
+    </div>
+    `;
+} else {
+    htmlContent += `
+    <div class="fr-alert fr-alert--info fr-mt-2w">
+        <p>Aucun agent dans cette structure.</p>
+    </div>
+    `;
+}
+
     let htmlContent = '';
 
     // ==========================================
