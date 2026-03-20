@@ -252,11 +252,15 @@ window.openModalForStructure = function (structId) {
 
     const title = safeStr(struct[COL_STRUCT_LIBELLE]);
 
-    // Responsable
+    // ✅ IMPORTANT : initialiser AVANT utilisation
+    let htmlContent = '';
+
+    // =========================
+    // RESPONSABLE
+    // =========================
     const respNameRaw = findResponsableName(struct, agentsHierarchyMap);
     const respName = safeHtml(respNameRaw);
 
-    // Recherche de l'agent correspondant
     let respAgent = null;
 
     if (respNameRaw) {
@@ -268,34 +272,77 @@ window.openModalForStructure = function (structId) {
         );
     }
 
-    // 2. Liste des agents de la structure
-const agentsOfStruct = allAgents.filter(a =>
-    window.safeStr(a[COL_AGENT_STRUCTURE]) === window.safeStr(struct[COL_STRUCT_CODE])
-);
+    if (respNameRaw) {
+        const fct = respAgent ? safeHtml(respAgent[COL_AGENT_FONCTION]) : "Responsable";
 
-if (agentsOfStruct.length > 0) {
+        htmlContent += `
+        <div class="fr-card fr-card--no-border fr-mb-2w">
+            <div class="fr-card__body">
+                <div class="fr-card__content">
+                    <h3 class="fr-card__title">
+                        👤 ${respName}
+                    </h3>
+                    <p class="fr-card__desc">${fct}</p>
+                </div>
+            </div>
+        </div>
+        `;
+    } else {
+        htmlContent += `
+        <div class="fr-alert fr-alert--warning fr-mb-2w">
+            <p>Aucun responsable identifié.</p>
+        </div>
+        `;
+    }
+
+    // =========================
+    // LISTE DES AGENTS
+    // =========================
+    const agentsOfStruct = allAgents.filter(a =>
+        window.safeStr(a[COL_AGENT_STRUCTURE]) === window.safeStr(struct[COL_STRUCT_CODE])
+    );
+
+    if (agentsOfStruct.length > 0) {
+        htmlContent += `
+        <div class="fr-mt-3w">
+            <h4>👥 Équipe</h4>
+            <ul class="fr-list">
+                ${agentsOfStruct.map(agent => {
+                    const nom = window.safeHtml(agent._fullname || "");
+                    const fonction = window.safeHtml(agent[COL_AGENT_FONCTION] || "");
+                    return `<li><strong>${nom}</strong> - ${fonction}</li>`;
+                }).join("")}
+            </ul>
+        </div>
+        `;
+    } else {
+        htmlContent += `
+        <div class="fr-alert fr-alert--info fr-mt-2w">
+            <p>Aucun agent dans cette structure.</p>
+        </div>
+        `;
+    }
+
+    // =========================
+    // BOUTON
+    // =========================
     htmlContent += `
-    <div class="fr-mt-3w">
-        <h4>👥 Équipe</h4>
-        <ul class="fr-list">
-            ${agentsOfStruct.map(agent => {
-                const nom = window.safeHtml(agent._fullname || "");
-                const fonction = window.safeHtml(agent[COL_AGENT_FONCTION] || "");
-                return `<li><strong>${nom}</strong> - ${fonction}</li>`;
-            }).join("")}
-        </ul>
+    <div class="fr-grid-row fr-grid-row--center fr-mt-3w">
+        <a href="search.html?structure=${structId}" 
+           class="fr-btn fr-btn--secondary fr-btn--icon-right fr-icon-arrow-right-line">
+            Voir toute l'équipe
+        </a>
     </div>
     `;
-} else {
-    htmlContent += `
-    <div class="fr-alert fr-alert--info fr-mt-2w">
-        <p>Aucun agent dans cette structure.</p>
-    </div>
-    `;
-}
 
-    let htmlContent = '';
+    // =========================
+    // AFFICHAGE MODALE
+    // =========================
+    document.getElementById('modal-title').innerText = title;
+    document.getElementById('modal-body').innerHTML = htmlContent;
 
+    document.getElementById('dsfr-hidden-modal-btn').click();
+};
     // ==========================================
     // 1. CARTE RESPONSABLE
     // ==========================================
