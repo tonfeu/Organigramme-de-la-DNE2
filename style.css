@@ -25,10 +25,10 @@
     gap: 1rem;
 }
 
-/* --- GRILLE PRINCIPALE (4 COLONNES) --- */
+/* --- GRILLE PRINCIPALE (5 COLONNES) --- */
 .main-grid {
     display: grid;
-    grid-template-columns: repeat(4, 1fr); /* 4 colonnes de même largeur */
+    grid-template-columns: repeat(5, 1fr); /* 5 colonnes de même largeur */
     gap: 1.5rem; /* Espacement entre colonnes */
     align-items: start;
 }
