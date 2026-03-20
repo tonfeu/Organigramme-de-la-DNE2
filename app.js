@@ -164,7 +164,7 @@ function renderTopZone() {
 // Affiche les colonnes principales (1 à 4)
 function renderColumns() {
 
-    for (let i = 1; i <= 5; i++) {
+    for (let i = 1; i <= 4; i++) {
 
         const container = document.getElementById(`col-${i}`);
         if (!container) continue;
