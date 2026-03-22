@@ -11,8 +11,8 @@ const textFilterQuery = urlParams.get('q'); // Requête texte libre
 // Données globales
 let allAgents = [];
 let allStructures = [];
-let structureMap = new Map(); // O(1) pour les perfs de recherche
-let agentsHierarchyMap = new Map(); // O(1) pour la hiéarchie
+let structureMap = new Map(); // pour les perfs de recherche
+let agentsHierarchyMap = new Map(); //  pour la hiéarchie
 
 // ==========================================
 // INITIALISATION

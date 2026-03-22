@@ -29,7 +29,7 @@ let agentsHierarchyMap = new Map(); // Accès rapide à la hiérarchie des agent
  */
 async function init() {
     try {
-        console.log("Chargement Organigramme V1 (Interne Grist)...");
+        console.log("Chargement Organigramme ...");
 
         // ==========================================
         // 1. RÉCUPÉRATION DES DONNÉES GRIST
@@ -244,31 +244,23 @@ function createDsfrTile(container, struct, extraClass = '') {
  * Ouvre la modale pour une structure donnée
  */
 window.openModalForStructure = function (structId) {
-
     if (!structId) return;
-
     const struct = allStructures.find(s => s.id === structId);
     if (!struct) return;
 
     const title = safeStr(struct[COL_STRUCT_LIBELLE]);
-
-    // Responsable
     const respNameRaw = findResponsableName(struct, agentsHierarchyMap);
     const respName = safeHtml(respNameRaw);
 
-    // Recherche de l'agent correspondant
+    // Recherche des détails de l'agent responsable (via cache normalisé)
     let respAgent = null;
-
     if (respNameRaw) {
         const target = window.normalizeString(respNameRaw);
-
         respAgent = allAgents.find(a =>
             (a._fullname && a._fullname.includes(target)) ||
             (a._fullnameReverse && a._fullnameReverse.includes(target))
         );
     }
-
-    
 
     let htmlContent = '';
 
