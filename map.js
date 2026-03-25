@@ -43,7 +43,7 @@ const COL_AGENT_SECTEUR = 'Secteur_ou_cellule_'; // Secteur
 const COL_AGENT_DESC_SECTEUR = 'Description_secteur'; // Description secteur
 
 // ======================
-// 📌 COLONNES STRUCTURES
+// COLONNES STRUCTURES
 // ======================
 const COL_STRUCT_CODE = 'Structure'; // Code unique
 const COL_STRUCT_LIBELLE = 'Libelle'; // Nom de la structure
@@ -87,7 +87,7 @@ window.safeHtml = function (val, def = "") {
 };
 
 // ======================
-// 🔎 Recherche optimisée
+//  Recherche optimisée
 // ======================
 
 // Normalise texte (minuscules + sans accents)
@@ -109,10 +109,10 @@ window.transformColsToRows = function (cols) {
 };
 
 // ======================
-// ⚡ Optimisation des données
+//  Optimisation des données
 // ======================
 
-// Ajoute un cache pour recherche rapide O(1)
+// Ajoute un cache pour recherche rapide du nom complet (et inversé pour recherche par nom)
 window.enrichAgentsData = function (agentsArray) {
     agentsArray.forEach(agent => {
         const nom = safeStr(agent[COL_AGENT_NOM]);
@@ -144,7 +144,7 @@ window.createAgentsHierarchyMap = function (agentsArray) {
 };
 
 // ======================
-// 👨‍💼 Gestion hiérarchie
+//  Gestion hiérarchie
 // ======================
 
 // Trouve le responsable d’une structure
@@ -166,7 +166,7 @@ window.findResponsableName = function (structObject, agentsHierarchyMap) {
 };
 
 // ======================
-// ⏳ Optimisation UX
+//  Optimisation UX
 // ======================
 
 // Anti-spam de la recherche

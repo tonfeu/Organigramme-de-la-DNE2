@@ -96,7 +96,7 @@ async function init() {
         document.querySelector('.main-grid').innerHTML =
             `<div class="fr-alert fr-alert--error">${e.message}</div>`;
     }
-}
+} 
 
 // ==========================================
 // CONFIGURATION LOGO
