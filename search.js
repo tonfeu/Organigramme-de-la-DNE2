@@ -230,7 +230,7 @@ function performSearch() {
     }
 
     // ==========================================
-    // TRI DES RÉSULTATS
+    // TRI DES RÉSULTATS (Hiérarchique + Pôle)
     // ==========================================
 
     // Fonction utilitaire pour normaliser
