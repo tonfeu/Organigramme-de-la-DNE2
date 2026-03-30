@@ -205,7 +205,8 @@ window.copyToClipboard = function (text, btnElement) {
     });
 };
 
-// Tooltip visuel après copie (pas de dépendance externe, simple et efficace)
+// Tooltip visuel après copie (pas de dépendance externe, simple et efficace       
+
 function showCopyTooltip(element) {
     if (element.querySelector('.copy-tooltip')) return;
 
