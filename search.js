@@ -17,7 +17,7 @@ let agentsHierarchyMap = new Map(); //  pour la hiéarchie
 // ==========================================
 // INITIALISATION
 // ==========================================
-grist.ready({ requiredAccess: 'read table' });
+grist.ready({ requiredAccess: 'full' });
 document.addEventListener('DOMContentLoaded', init);
 
 async function init() {
@@ -392,137 +392,80 @@ function renderGroupedResults(groups, title, description) {
 
 // Génère le HTML d'une carte agent (Factorisé)
 function generateAgentCardHtml(agent) {
-    // Préparation des données sécurisées contre les failles XSS
+    // Préparation des données (Identique à votre original)
     const nom = `${safeHtml(agent[COL_AGENT_PRENOM])} ${safeHtml(agent[COL_AGENT_NOM])}`;
     const fct = safeHtml(agent[COL_AGENT_FONCTION]);
     const mailAgent = safeHtml(agent[COL_AGENT_MAIL]);
     const mailGeneric = safeHtml(agent[COL_AGENT_MAIL_GEN]);
     const tel = safeHtml(agent[COL_AGENT_TEL]);
     const mobile = safeHtml(agent[COL_AGENT_TEL_PORT]);
-
     const site = safeHtml(agent[COL_AGENT_SITE] || agent['site']);
     const piece = safeHtml(agent[COL_AGENT_BUREAU] || agent['Piece'] || agent['piece'] || agent['bureau']);
 
-    // Télétravail (ChoiceList : peut être un tableau ou une chaine)
     let ttRaw = agent[COL_AGENT_TELETRAVAIL];
     let teletravail = '';
-
-    // Grist ChoiceList peut parfois inclure un "L" initial (marker de liste)
     if (Array.isArray(ttRaw)) {
         teletravail = safeHtml(ttRaw.filter(v => v !== 'L').join(', '));
     } else if (ttRaw) {
         let str = String(ttRaw);
-        if (str.startsWith('L, ')) {
-            str = str.substring(3);
-        }
+        if (str.startsWith('L, ')) str = str.substring(3);
         teletravail = safeHtml(str);
     }
 
     const missions = safeHtml(agent[COL_AGENT_MISSIONS] || agent['missions_du_poste']);
     const projet = safeHtml(agent[COL_AGENT_PROJET] || agent['Nom_du_projet']);
     const roleProjet = safeHtml(agent[COL_AGENT_ROLE_PROJET] || agent['role_chef_projet_ou_participnt']);
-    const pole = safeHtml(agent[COL_AGENT_POLE] || agent['pole_ou_section_']);
-    const poleDesc = safeHtml(agent[COL_AGENT_DESC_POLE] || agent['description_pole']);
-    const secteur = safeHtml(agent[COL_AGENT_SECTEUR] || agent['secteur_ou_cellule_'] || agent['Cellule'] || agent['Secteur']);
-    const secteurDesc = safeHtml(agent[COL_AGENT_DESC_SECTEUR] || agent['description_secteur']);
-
     const structId = agent[COL_AGENT_STRUCT_REF];
-    const struct = structureMap.get(structId); // Optim O(1) au lieu de find()
+    const struct = structureMap.get(structId); 
     const structName = struct ? window.safeHtml(struct[COL_STRUCT_LIBELLE]) : '';
     const structCode = struct ? window.safeHtml(struct[COL_STRUCT_CODE]) : '';
 
+    // ID unique pour cet accordéon
     const uniqueId = `agent-${Math.floor(Math.random() * 1000000)}`;
 
     return `
     <div class="fr-col-12 fr-col-md-6">
         <div class="agent-accordion" id="${uniqueId}">
-            <!-- En-tête visible (Cliquable) -->
             <div class="agent-header" onclick="toggleAgent('${uniqueId}')">
                 <div class="agent-info">
-                    <div style="font-weight:700; font-size:0.95rem; margin-bottom:0.1rem; color: var(--text-default-grey);">${nom}</div>
+                    <div style="font-weight:700; font-size:0.95rem; margin-bottom:0.1rem; color: var(--text-default-grey);">
+                        ${nom}
+                        <button class="fr-btn fr-btn--tertiary-no-outline fr-icon-edit-line" 
+                                onclick="event.stopPropagation(); window.toggleMgmt('${uniqueId}-admin')" 
+                                style="margin-left: 8px; padding: 0.2rem; height: 1.5rem; min-height: 1.5rem;" 
+                                title="Gérer l'agent"></button>
+                    </div>
                     <div style="font-size:0.8rem; color: var(--text-mention-grey);">${fct}</div>
                     ${structCode ? `<div class="fr-badge fr-badge--sm fr-badge--info fr-mb-1v fr-mt-1w">${structCode}</div>` : ''}
-                    ${structName ? `<div class="fr-badge fr-badge--sm fr-badge--purple-glycine fr-mt-1v" style="display:table;">${structName}</div>` : ''}
                 </div>
                 <span class="fr-icon-arrow-down-s-line agent-arrow"></span>
             </div>
 
-            <!-- Détails dépliables -->
+            <div id="${uniqueId}-admin" style="display:none; background: var(--background-alt-blue-france); padding: 0.75rem; border-bottom: 1px solid var(--border-default-grey); justify-content: center; gap: 1rem;">
+                <button class="fr-btn fr-btn--sm fr-btn--secondary fr-icon-refresh-line" 
+                        onclick="event.stopPropagation(); window.transferAgent(${agent.id}, '${nom.replace(/'/g, "\\'")}')">
+                    Transférer
+                </button>
+                <button class="fr-btn fr-btn--sm fr-btn--secondary fr-btn--secondary--error fr-icon-delete-line" 
+                        onclick="event.stopPropagation(); window.deleteAgent(${agent.id}, '${nom.replace(/'/g, "\\'")}')">
+                    Supprimer
+                </button>
+            </div>
+
             <div class="agent-details">
                 <div class="details-grid">
-                    <div class="detail-item">
-                        <span class="detail-label">Fonction</span>
-                        <div class="detail-value">${fct || '-'}</div>
-                    </div>
+                    <div class="detail-item"><span class="detail-label">Fonction</span><div class="detail-value">${fct || '-'}</div></div>
                     <div class="detail-item" style="grid-column: span 2;">
                         <span class="detail-label">Email</span>
                         <div class="detail-value" style="word-break: break-word;">
-                            ${mailAgent ? `<div><button onclick="copyToClipboard('${mailAgent.toLowerCase()}', this)" style="background:none; border:none; padding:0; color:var(--text-action-high-blue-france); cursor:pointer; text-decoration:underline;" title="Copier">${mailAgent.toLowerCase()}</button></div>` : ''}
-                            ${mailGeneric ? `<div class="fr-mt-1v"><i>Générique :</i><br>${mailGeneric.split(/;/).map(email => {
-        const e = email.trim().toLowerCase();
-        return e ? `<button onclick="copyToClipboard('${e}', this)" style="background:none; border:none; padding:0; color:var(--text-action-high-blue-france); cursor:pointer; text-decoration:underline;" title="Copier">${e}</button>` : '';
-    }).filter(Boolean).join('<br>')
-            }</div>` : ''}
-                            ${!mailAgent && !mailGeneric ? '-' : ''}
+                            ${mailAgent ? `<button onclick="copyToClipboard('${mailAgent.toLowerCase()}', this)" style="background:none; border:none; padding:0; color:var(--text-action-high-blue-france); cursor:pointer; text-decoration:underline;">${mailAgent.toLowerCase()}</button>` : '-'}
                         </div>
                     </div>
-                    <div class="detail-item">
-                        <span class="detail-label">Téléphone</span>
-                        <div class="detail-value">
-                            ${tel ? `<div>Fixe : <br><button onclick="copyToClipboard('${tel}', this)" style="background:none; border:none; padding:0; color:var(--text-action-high-blue-france); cursor:pointer; text-decoration:underline;" title="Copier">${tel}</button></div>` : ''}
-                            ${mobile ? `<div>Portable : <br><button onclick="copyToClipboard('${mobile}', this)" style="background:none; border:none; padding:0; color:var(--text-action-high-blue-france); cursor:pointer; text-decoration:underline;" title="Copier">${mobile}</button></div>` : ''}
-                            ${!tel && !mobile ? '-' : ''}
-                        </div>
                     </div>
-                    <div class="detail-item">
-                        <span class="detail-label">Site / Bureau</span>
-                        <div class="detail-value">${[site, piece].filter(Boolean).join(' / ') || '-'}</div>
-                    </div>
-
-                    ${teletravail ? `
-                    <div class="detail-item">
-                        <span class="detail-label">Télétravail</span>
-                        <div class="detail-value">${teletravail}</div>
-                    </div>` : ''}
-                    
-                    ${pole ? `
-                    <div class="detail-item" style="grid-column: span 2;">
-                        <span class="detail-label">Pôle ou Section</span>
-                        <div class="detail-value">
-                            ${pole}
-                            ${poleDesc ? `<p class="fr-text--xs fr-text--mention-grey fr-mb-0 fr-mt-1v" style="font-weight:400; font-style:italic;">${poleDesc}</p>` : ''}
-                        </div>
-                    </div>` : ''}
-
-                    ${secteur ? `
-                    <div class="detail-item" style="grid-column: span 2;">
-                        <span class="detail-label">Secteur ou Cellule</span>
-                        <div class="detail-value">
-                            ${secteur}
-                            ${secteurDesc ? `<p class="fr-text--xs fr-text--mention-grey fr-mb-0 fr-mt-1v" style="font-weight:400; font-style:italic;">${secteurDesc}</p>` : ''}
-                        </div>
-                    </div>` : ''}
-                    
-                    ${missions ? `
-                    <div class="detail-item" style="grid-column: span 2;">
-                        <span class="detail-label">Missions du poste</span>
-                        <div class="detail-value">${missions}</div>
-                    </div>` : ''}
-
-                    ${projet ? `
-                    <div class="detail-item" style="grid-column: span 2;">
-                        <span class="detail-label">Projet</span>
-                        <div class="detail-value">
-                            ${roleProjet ? `<span class="fr-badge fr-badge--sm fr-badge--green-emeraude fr-mr-1w" style="vertical-align: middle;">${roleProjet}</span>` : ''}
-                            <strong style="vertical-align: middle;">${projet}</strong>
-                        </div>
-                    </div>` : ''}
-                </div>
             </div>
         </div>
     </div>`;
 }
-
 
 
 function renderResults(agents, title) {

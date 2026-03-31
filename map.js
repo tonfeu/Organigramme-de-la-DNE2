@@ -223,3 +223,40 @@ function showCopyTooltip(element) {
         }
     }, 2000);
 }
+
+// --- FONCTIONS DE GESTION DES AGENTS ---
+
+// Affiche/Masque le menu Modifier
+window.toggleMgmt = function(id) {
+    const menu = document.getElementById(`mgmt-menu-${id}`);
+    if (menu) menu.classList.toggle('is-active');
+};
+
+// Action : Supprimer
+window.deleteAgent = async function(id, name) {
+    if (confirm(`⚠️ Supprimer définitivement ${name} de l'annuaire ?`)) {
+        try {
+            await grist.docApi.deleteRecords(TABLE_AGENTS, [id]);
+            location.reload(); // Rafraîchit pour voir le changement
+        } catch (e) {
+            alert("Erreur lors de la suppression. Vérifiez vos droits d'accès.");
+        }
+    }
+};
+
+// Action : Transférer
+window.transferAgent = async function(id, name) {
+    const structures = allStructures.map(s => `${s.id} : ${s[COL_STRUCT_LIBELLE]}`).join('\n');
+    const newId = prompt(`Vers quelle structure transférer ${name} ?\n\nID DISPONIBLES :\n${structures}\n\nSaisissez l'ID (chiffre) :`);
+    
+    if (newId && !isNaN(newId)) {
+        try {
+            await grist.docApi.updateRecords(TABLE_AGENTS, [
+                { id: id, fields: { [COL_AGENT_STRUCT_REF]: parseInt(newId) } }
+            ]);
+            location.reload();
+        } catch (e) {
+            alert("Erreur de transfert. L'ID est-il correct ?");
+        }
+    }
+};

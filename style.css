@@ -469,3 +469,30 @@ dialog[open] .fr-modal__body { animation: modal-fade 0.3s ease-out forwards; }
     text-transform: uppercase;
     vertical-align: middle;
 }
+
+/* Bouton de gestion (le petit engrenage ou crayon) */
+.btn-edit-agent {
+    padding: 0.2rem !important;
+    min-height: 1.5rem !important;
+    font-size: 0.8rem !important;
+    margin-left: 5px;
+    opacity: 0.6;
+}
+.btn-edit-agent:hover { opacity: 1; }
+
+/* Menu d'actions (caché par défaut) */
+.mgmt-menu {
+    display: none;
+    background: #f6f6f6;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    margin-top: 8px;
+    text-align: center;
+}
+
+.mgmt-menu.is-active {
+    display: flex;
+    justify-content: space-around;
+    gap: 10px;
+}

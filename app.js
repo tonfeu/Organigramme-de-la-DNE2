@@ -10,7 +10,7 @@
 // Note : Les constantes (noms de colonnes, tables, etc.) sont définies dans utils.js
 
 // Initialisation du plugin Grist avec accès en lecture
-grist.ready({ requiredAccess: 'read table' });
+grist.ready({ requiredAccess: 'full' });
 
 // Lancement de la fonction principale après chargement du DOM
 document.addEventListener('DOMContentLoaded', init);
@@ -52,6 +52,9 @@ async function init() {
             }
         }));
 
+
+
+
         // ==========================================
         // 2. PRÉPARATION ET OPTIMISATION DES DONNÉES
         // ==========================================
@@ -67,6 +70,10 @@ async function init() {
 
         // Index des structures (accès rapide par ID)
         structureMap = window.createStructureMap(allStructures);
+
+        
+        console.log("Agents :", allAgents);
+        console.log("Structures :", allStructures);
 
         // ==========================================
         // 3. CONFIGURATION DU LOGO
@@ -97,6 +104,8 @@ async function init() {
             `<div class="fr-alert fr-alert--error">${e.message}</div>`;
     }
 } 
+
+
 
 // ==========================================
 // CONFIGURATION LOGO
