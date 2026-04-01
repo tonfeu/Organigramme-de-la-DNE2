@@ -480,17 +480,23 @@ window.toggleMgmt = function(adminId) {
 };
 
 // Fonction pour supprimer un agent
-window.deleteAgent = async function(id, name) {
-    if (confirm(`Voulez-vous vraiment supprimer ${name} de la base ?`)) {
-        try {
-            await grist.docApi.deleteRecords(TABLE_AGENTS, [id]);
-            alert("Agent supprimé.");
-            location.reload(); // Recharge la page pour actualiser la liste
-        } catch (e) {
-            alert("Erreur lors de la suppression. Vérifiez vos droits d'accès.");
-        }
+async function deleteAgent(agentId, agentName) {
+    if (!confirm(`Voulez-vous vraiment supprimer l'agent ${agentName} ?`)) return;
+
+    try {
+        // Appel à l'API Grist pour supprimer l'enregistrement
+        await grist.docApi.deleteRecords(TABLE_AGENTS, [agentId]);
+        
+        // Rafraîchir l'affichage localement
+        allAgents = allAgents.filter(a => a.id !== agentId);
+        performSearch(); // Relance la recherche pour mettre à jour la liste
+        
+        alert("Agent supprimé avec succès.");
+    } catch (error) {
+        console.error("Erreur de suppression:", error);
+        alert("Erreur lors de la suppression. Vérifiez que l'accès est réglé sur 'Full' dans Grist.");
     }
-};
+}
 
 // Fonction pour transférer un agent
 window.transferAgent = async function(id, name) {
