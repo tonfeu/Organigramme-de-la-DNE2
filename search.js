@@ -397,34 +397,38 @@ function renderGroupedResults(groups, title, description) {
 
 // Génère le HTML d'une carte agent (Factorisé)
 function generateAgentCardHtml(agent) {
-    const nom = `${safeHtml(agent[COL_AGENT_PRENOM])} ${safeHtml(agent[COL_AGENT_NOM])}`;
-    const fct = safeHtml(agent[COL_AGENT_FONCTION]);
-    const mailAgent = safeHtml(agent[COL_AGENT_MAIL]);
+    // 1. Préparation des données de l'agent
+    const nom = `${safeHtml(agent[COL_AGENT_PRENOM] || '')} ${safeHtml(agent[COL_AGENT_NOM] || '')}`;
+    const fct = safeHtml(agent[COL_AGENT_FONCTION] || 'Non renseignée');
+    const mailAgent = safeHtml(agent[COL_AGENT_MAIL] || '');
+    
+    // Récupération du code de la structure actuelle
     const structId = agent[COL_AGENT_STRUCT_REF];
     const struct = structureMap.get(structId); 
-    const structCode = struct ? window.safeHtml(struct[COL_STRUCT_CODE]) : '';
+    const structCode = struct ? safeHtml(struct[COL_STRUCT_CODE]) : '';
 
-    // Génération d'un ID unique pour ce bloc
+    // Génération d'un ID unique pour isoler les éléments de cette carte
     const uniqueId = `agent-${Math.floor(Math.random() * 1000000)}`;
 
-    // Préparation de la liste des structures pour le transfert
-    // On trie par nom de bureau pour que ce soit plus simple à trouver
+    // 2. Préparation de la liste des structures pour le transfert (triée par nom)
     const optionsStructures = allStructures
+        .slice() // Copie pour ne pas modifier l'original
         .sort((a, b) => (a[COL_STRUCT_LIBELLE] || "").localeCompare(b[COL_STRUCT_LIBELLE] || ""))
         .map(s => `<option value="${s.id}">${safeHtml(s[COL_STRUCT_LIBELLE] || s[COL_STRUCT_CODE])}</option>`)
         .join('');
 
+    // 3. Retour du template HTML
     return `
     <div class="fr-col-12 fr-col-md-6">
         <div class="agent-accordion" id="${uniqueId}">
-            <div class="agent-header" onclick="toggleAgent('${uniqueId}')">
+            <div class="agent-header" onclick="window.toggleAgent('${uniqueId}')">
                 <div class="agent-info">
                     <div style="font-weight:700; font-size:0.95rem; margin-bottom:0.1rem; color: var(--text-default-grey);">
                         ${nom}
                         <button class="fr-btn fr-btn--tertiary-no-outline fr-icon-edit-line" 
                                 onclick="event.stopPropagation(); window.toggleMgmt('${uniqueId}-admin')" 
                                 style="margin-left: 8px; padding: 0.2rem; height: 1.5rem; min-height: 1.5rem;" 
-                                title="Modifier"></button>
+                                title="Modifier ou Transférer"></button>
                     </div>
                     <div style="font-size:0.8rem; color: var(--text-mention-grey);">${fct}</div>
                     ${structCode ? `<div class="fr-badge fr-badge--sm fr-badge--info fr-mb-1v fr-mt-1w">${structCode}</div>` : ''}
@@ -432,24 +436,26 @@ function generateAgentCardHtml(agent) {
                 <span class="fr-icon-arrow-down-s-line agent-arrow"></span>
             </div>
 
-            <div id="${uniqueId}-admin" style="display:none; background: #f6f6f6; padding: 1rem; border-bottom: 1px solid #ddd;">
-                <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+            <div id="${uniqueId}-admin" style="display:none; background: #f0f0f0; padding: 1rem; border-bottom: 1px solid #ddd; border-top: 1px solid #ddd;">
+                <div style="display: flex; flex-direction: column; gap: 1rem;">
                     
                     <div style="display: flex; gap: 0.5rem; align-items: flex-end;">
                         <div class="fr-select-group" style="margin-bottom: 0; flex-grow: 1;">
-                            <label class="fr-label" style="font-size: 0.75rem;">Transférer vers :</label>
+                            <label class="fr-label" style="font-size: 0.75rem; font-weight: bold;">TRANSFÉRER VERS :</label>
                             <select class="fr-select fr-select--sm" id="select-transfer-${uniqueId}" onclick="event.stopPropagation()">
                                 <option value="" selected disabled>Choisir un bureau...</option>
                                 ${optionsStructures}
                             </select>
                         </div>
-                        <button class="fr-btn fr-btn--sm fr-icon-check-line" 
+                        <button class="fr-btn fr-btn--sm fr-icon-checkbox-circle-line" 
+                                style="background-color: var(--background-action-high-blue-france);"
                                 onclick="event.stopPropagation(); window.executeTransfer(${agent.id}, '${uniqueId}', '${nom.replace(/'/g, "\\'")}')"
                                 title="Valider le transfert"></button>
                     </div>
 
-                    <div style="text-align: right;">
-                        <button class="fr-btn fr-btn--sm fr-btn--secondary fr-btn--secondary--error fr-icon-delete-line" 
+                    <div style="text-align: right; border-top: 1px path solid #e5e5e5; pt-1w;">
+                        <button class="fr-btn fr-btn--sm fr-btn--secondary fr-icon-delete-line fr-btn--icon-left" 
+                                style="color: var(--text-default-error); box-shadow: inset 0 0 0 1px var(--text-default-error);"
                                 onclick="event.stopPropagation(); window.deleteAgent(${agent.id}, '${nom.replace(/'/g, "\\'")}')">
                             Supprimer l'agent
                         </button>
@@ -458,12 +464,19 @@ function generateAgentCardHtml(agent) {
             </div>
 
             <div class="agent-details">
-                <div class="details-grid">
-                    <div class="detail-item"><span class="detail-label">Fonction</span><div class="detail-value">${fct || '-'}</div></div>
-                    <div class="detail-item" style="grid-column: span 2;">
-                        <span class="detail-label">Email</span>
+                <div class="details-grid" style="padding: 1rem;">
+                    <div class="detail-item">
+                        <span class="detail-label" style="font-size: 0.7rem; text-transform: uppercase; color: #666;">Fonction</span>
+                        <div class="detail-value" style="font-weight: 500;">${fct}</div>
+                    </div>
+                    <div class="detail-item" style="grid-column: span 2; margin-top: 0.5rem;">
+                        <span class="detail-label" style="font-size: 0.7rem; text-transform: uppercase; color: #666;">Email</span>
                         <div class="detail-value">
-                             ${mailAgent ? `<button onclick="copyToClipboard('${mailAgent.toLowerCase()}', this)" style="background:none; border:none; padding:0; color:var(--text-action-high-blue-france); cursor:pointer; text-decoration:underline;">${mailAgent.toLowerCase()}</button>` : '-'}
+                             ${mailAgent ? `
+                                <button onclick="event.stopPropagation(); copyToClipboard('${mailAgent.toLowerCase()}', this)" 
+                                        style="background:none; border:none; padding:0; color:var(--text-action-high-blue-france); cursor:pointer; text-decoration:underline; font-size: 0.9rem;">
+                                    ${mailAgent.toLowerCase()}
+                                </button>` : '-'}
                         </div>
                     </div>
                 </div>
@@ -471,6 +484,7 @@ function generateAgentCardHtml(agent) {
         </div>
     </div>`;
 }
+
 function renderResults(agents, title) {
     const container = document.getElementById('resultArea');
 
@@ -573,28 +587,54 @@ window.executeTransfer = async function(agentId, uniqueId, agentName) {
         alert("Erreur lors du transfert. Vérifiez vos droits d'accès.");
     }
 };
-
 // ==========================================
-// GESTION DE L'INTERFACE (UI)
+// GESTION DE L'INTERFACE (UI) & ACTIONS
 // ==========================================
 
-/**
- * Affiche ou masque le bandeau d'administration (Transfert/Suppression)
- */
+// Affiche/Masque le bandeau gris d'administration
 window.toggleMgmt = function(id) {
     const el = document.getElementById(id);
     if (el) {
-        // Alterne entre l'affichage et le masquage
-        el.style.display = (el.style.display === 'none' || el.style.display === '') ? 'block' : 'none';
+        el.style.display = (el.style.display === 'none' || el.style.display === '') ? 'flex' : 'none';
     }
 };
 
-/**
- * Gère l'ouverture et la fermeture de l'accordéon d'un agent
- */
+// Gère l'ouverture de l'accordéon
 window.toggleAgent = function(id) {
     const el = document.getElementById(id);
     if (el) {
         el.classList.toggle('open');
+    }
+};
+
+// LA NOUVELLE FONCTION (Remplace celle avec le prompt)
+window.executeTransfer = async function(agentId, uniqueId, agentName) {
+    const selectEl = document.getElementById(`select-transfer-${uniqueId}`);
+    const newStructureId = parseInt(selectEl.value);
+
+    if (!newStructureId) {
+        alert("Veuillez sélectionner un bureau dans la liste avant de valider.");
+        return;
+    }
+
+    if (!confirm(`Transférer ${agentName} vers cette structure ?`)) return;
+
+    try {
+        await grist.docApi.applyUserActions([
+            ["UpdateRecord", TABLE_AGENTS, agentId, {
+                [COL_AGENT_STRUCT_REF]: newStructureId 
+            }]
+        ]);
+
+        alert("Transfert réussi !");
+        
+        // Mise à jour locale pour éviter le rechargement
+        const agent = allAgents.find(a => a.id === agentId);
+        if (agent) agent[COL_AGENT_STRUCT_REF] = newStructureId;
+        
+        performSearch(); 
+    } catch (error) {
+        console.error("Erreur transfert:", error);
+        alert("Erreur : Vérifiez que vous êtes bien en accès 'Full'.");
     }
 };
