@@ -461,6 +461,7 @@ function renderResults(agents, title) {
     html += `<div class="fr-grid-row fr-grid-row--gutters">`;
 
     agents.forEach(agent => {
+        // Appelle la fonction de génération de carte qui contient maintenant le bouton
         html += generateAgentCardHtml(agent);
     });
 
