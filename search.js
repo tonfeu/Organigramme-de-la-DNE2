@@ -72,6 +72,20 @@ async function init() {
         console.error("ERREUR :", e);
         document.getElementById('resultArea').innerHTML = `<div class="fr-alert fr-alert--error">${e.message}</div>`;
     }
+
+    function prepareAddForm() {
+    const select = document.getElementById('new-agent-struct');
+    if (!select) return;
+    
+    // On réutilise allStructures pour remplir le select du formulaire
+    select.innerHTML = '<option value="" disabled selected>Choisir une structure...</option>' + 
+        allStructures.map(s => `<option value="${s.id}">${safeStr(s[COL_STRUCT_LIBELLE])}</option>`).join('');
+
+    // Si on est admin, on affiche le bouton "Ajouter"
+    if (grist.getAccessLevel() === 'full') {
+        document.getElementById('admin-add-section').style.display = 'block';
+    }
+}
 }
 
 // ==========================================
@@ -637,4 +651,47 @@ window.executeTransfer = async function(agentId, uniqueId, agentName) {
         console.error("Erreur transfert:", error);
         alert("Erreur : Vérifiez que vous êtes bien en accès 'Full'.");
     }
+};
+window.submitNewAgent = async function() {
+    // 1. Récupération des valeurs
+    const prenom = document.getElementById('new-agent-prenom').value.trim();
+    const nom = document.getElementById('new-agent-nom').value.trim();
+    const fct = document.getElementById('new-agent-fct').value.trim();
+    const structId = parseInt(document.getElementById('new-agent-struct').value);
+
+    // 2. Validation minimale
+    if (!nom || !structId) {
+        alert("Le nom et la structure sont obligatoires.");
+        return;
+    }
+
+    try {
+        // 3. Envoi à Grist via AddRecord
+        await grist.docApi.applyUserActions([
+            ["AddRecord", TABLE_AGENTS, null, {
+                [COL_AGENT_PRENOM]: prenom,
+                [COL_AGENT_NOM]: nom,
+                [COL_AGENT_FONCTION]: fct,
+                [COL_AGENT_STRUCT_REF]: structId
+            }]
+        ]);
+
+        alert("Agent ajouté avec succès !");
+        
+        // 4. Nettoyage et rafraîchissement
+        document.querySelectorAll('#add-agent-form input').forEach(i => i.value = '');
+        window.toggleAddForm();
+        
+        // Optionnel : Recharger les données pour voir le nouvel agent
+        location.reload(); 
+
+    } catch (error) {
+        console.error("Erreur ajout agent:", error);
+        alert("Impossible d'ajouter l'agent. Vérifiez vos droits.");
+    }
+};
+
+window.toggleAddForm = function() {
+    const form = document.getElementById('add-agent-form');
+    form.style.display = (form.style.display === 'none') ? 'block' : 'none';
 };
