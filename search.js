@@ -17,7 +17,12 @@ let agentsHierarchyMap = new Map(); //  pour la hiéarchie
 // ==========================================
 // INITIALISATION
 // ==========================================
-grist.ready({ requiredAccess: 'full' });
+grist.ready({ 
+  requiredAccess: 'full',
+  onRecords: function(records) {
+    // Cette fonction optionnelle peut aider à stabiliser la connexion
+  }
+});
 document.addEventListener('DOMContentLoaded', init);
 
 async function init() {
@@ -481,24 +486,40 @@ window.toggleMgmt = function(adminId) {
 };
 
 async function deleteAgent(agentId, agentName) {
-    const confirmation = confirm(`Êtes-vous sûr de vouloir supprimer l'agent "${agentName}" ? Cette action est irréversible dans Grist.`);
-    
+    if (!agentId) {
+        console.error("ID de l'agent manquant");
+        return;
+    }
+
+    const confirmation = confirm(`Confirmer la suppression définitive de : ${agentName} ?`);
     if (!confirmation) return;
 
     try {
-        // Suppression dans Grist
-        await grist.docApi.deleteRecords(TABLE_AGENTS, [agentId]);
+        console.log(`Tentative de suppression de l'ID: ${agentId} sur la table: ${TABLE_AGENTS}`);
         
-        // Mise à jour locale de la liste
+        // Nouvelle méthode : Envoi d'une action brute à Grist
+        await grist.docApi.applyUserActions([
+            ["RemoveRecord", TABLE_AGENTS, agentId]
+        ]);
+
+        console.log("Suppression réussie côté Grist");
+
+        // Mise à jour de l'affichage local
         allAgents = allAgents.filter(a => a.id !== agentId);
         
-        // Rafraîchissement de l'affichage
-        performSearch(); 
-        
-        alert("L'agent a été supprimé avec succès.");
+        // On force le rendu pour faire disparaître la carte
+        if (typeof performSearch === 'function') {
+            performSearch();
+        } else {
+            // Si performSearch n'est pas accessible, on vide juste la zone et on recharge
+            document.getElementById('resultArea').innerHTML = "";
+            location.reload(); 
+        }
+
+        alert("Agent supprimé.");
     } catch (error) {
-        console.error("Erreur Grist:", error);
-        alert("Erreur lors de la suppression. Vérifiez que le widget est bien configuré sur 'Access Level: Full'.");
+        console.error("Détails de l'erreur Grist:", error);
+        alert(`Erreur : ${error.message}\n\nAssurez-vous que le widget est bien en 'Access Level: Full' dans les paramètres Grist.`);
     }
 }
 // Fonction pour transférer un agent

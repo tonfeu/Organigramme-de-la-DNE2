@@ -10,7 +10,12 @@
 // Note : Les constantes (noms de colonnes, tables, etc.) sont définies dans utils.js
 
 // Initialisation du plugin Grist avec accès en lecture
-grist.ready({ requiredAccess: 'full' });
+grist.ready({ 
+  requiredAccess: 'full',
+  onRecords: function(records) {
+    // Cette fonction optionnelle peut aider à stabiliser la connexion
+  }
+});
 
 // Lancement de la fonction principale après chargement du DOM
 document.addEventListener('DOMContentLoaded', init);
