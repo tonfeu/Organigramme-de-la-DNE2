@@ -392,35 +392,14 @@ function renderGroupedResults(groups, title, description) {
 
 // Génère le HTML d'une carte agent (Factorisé)
 function generateAgentCardHtml(agent) {
-    // Préparation des données (Identique à votre original)
     const nom = `${safeHtml(agent[COL_AGENT_PRENOM])} ${safeHtml(agent[COL_AGENT_NOM])}`;
     const fct = safeHtml(agent[COL_AGENT_FONCTION]);
     const mailAgent = safeHtml(agent[COL_AGENT_MAIL]);
-    const mailGeneric = safeHtml(agent[COL_AGENT_MAIL_GEN]);
-    const tel = safeHtml(agent[COL_AGENT_TEL]);
-    const mobile = safeHtml(agent[COL_AGENT_TEL_PORT]);
-    const site = safeHtml(agent[COL_AGENT_SITE] || agent['site']);
-    const piece = safeHtml(agent[COL_AGENT_BUREAU] || agent['Piece'] || agent['piece'] || agent['bureau']);
-
-    let ttRaw = agent[COL_AGENT_TELETRAVAIL];
-    let teletravail = '';
-    if (Array.isArray(ttRaw)) {
-        teletravail = safeHtml(ttRaw.filter(v => v !== 'L').join(', '));
-    } else if (ttRaw) {
-        let str = String(ttRaw);
-        if (str.startsWith('L, ')) str = str.substring(3);
-        teletravail = safeHtml(str);
-    }
-
-    const missions = safeHtml(agent[COL_AGENT_MISSIONS] || agent['missions_du_poste']);
-    const projet = safeHtml(agent[COL_AGENT_PROJET] || agent['Nom_du_projet']);
-    const roleProjet = safeHtml(agent[COL_AGENT_ROLE_PROJET] || agent['role_chef_projet_ou_participnt']);
     const structId = agent[COL_AGENT_STRUCT_REF];
     const struct = structureMap.get(structId); 
-    const structName = struct ? window.safeHtml(struct[COL_STRUCT_LIBELLE]) : '';
     const structCode = struct ? window.safeHtml(struct[COL_STRUCT_CODE]) : '';
 
-    // ID unique pour cet accordéon
+    // Génération d'un ID unique pour ce bloc
     const uniqueId = `agent-${Math.floor(Math.random() * 1000000)}`;
 
     return `
@@ -433,7 +412,7 @@ function generateAgentCardHtml(agent) {
                         <button class="fr-btn fr-btn--tertiary-no-outline fr-icon-edit-line" 
                                 onclick="event.stopPropagation(); window.toggleMgmt('${uniqueId}-admin')" 
                                 style="margin-left: 8px; padding: 0.2rem; height: 1.5rem; min-height: 1.5rem;" 
-                                title="Gérer l'agent"></button>
+                                title="Modifier"></button>
                     </div>
                     <div style="font-size:0.8rem; color: var(--text-mention-grey);">${fct}</div>
                     ${structCode ? `<div class="fr-badge fr-badge--sm fr-badge--info fr-mb-1v fr-mt-1w">${structCode}</div>` : ''}
@@ -441,7 +420,7 @@ function generateAgentCardHtml(agent) {
                 <span class="fr-icon-arrow-down-s-line agent-arrow"></span>
             </div>
 
-            <div id="${uniqueId}-admin" style="display:none; background: var(--background-alt-blue-france); padding: 0.75rem; border-bottom: 1px solid var(--border-default-grey); justify-content: center; gap: 1rem;">
+            <div id="${uniqueId}-admin" style="display:none; background: #f6f6f6; padding: 0.75rem; border-bottom: 1px solid #ddd; justify-content: center; gap: 1rem;">
                 <button class="fr-btn fr-btn--sm fr-btn--secondary fr-icon-refresh-line" 
                         onclick="event.stopPropagation(); window.transferAgent(${agent.id}, '${nom.replace(/'/g, "\\'")}')">
                     Transférer
@@ -457,16 +436,15 @@ function generateAgentCardHtml(agent) {
                     <div class="detail-item"><span class="detail-label">Fonction</span><div class="detail-value">${fct || '-'}</div></div>
                     <div class="detail-item" style="grid-column: span 2;">
                         <span class="detail-label">Email</span>
-                        <div class="detail-value" style="word-break: break-word;">
-                            ${mailAgent ? `<button onclick="copyToClipboard('${mailAgent.toLowerCase()}', this)" style="background:none; border:none; padding:0; color:var(--text-action-high-blue-france); cursor:pointer; text-decoration:underline;">${mailAgent.toLowerCase()}</button>` : '-'}
+                        <div class="detail-value">
+                             ${mailAgent ? `<button onclick="copyToClipboard('${mailAgent.toLowerCase()}', this)" style="background:none; border:none; padding:0; color:var(--text-action-high-blue-france); cursor:pointer; text-decoration:underline;">${mailAgent.toLowerCase()}</button>` : '-'}
                         </div>
                     </div>
-                    </div>
+                </div>
             </div>
         </div>
     </div>`;
 }
-
 
 function renderResults(agents, title) {
     const container = document.getElementById('resultArea');
@@ -489,3 +467,43 @@ function renderResults(agents, title) {
     html += `</div>`;
     container.innerHTML = html;
 }
+
+// Fonction pour afficher/cacher le panneau de gestion
+window.toggleMgmt = function(adminId) {
+    const panel = document.getElementById(adminId);
+    if (panel) {
+        // Alterne entre 'none' et 'flex'
+        const isHidden = (panel.style.display === 'none' || panel.style.display === '');
+        panel.style.display = isHidden ? 'flex' : 'none';
+        console.log("Bascule du panneau :", adminId, isHidden ? "Affiché" : "Caché");
+    }
+};
+
+// Fonction pour supprimer un agent
+window.deleteAgent = async function(id, name) {
+    if (confirm(`Voulez-vous vraiment supprimer ${name} de la base ?`)) {
+        try {
+            await grist.docApi.deleteRecords(TABLE_AGENTS, [id]);
+            alert("Agent supprimé.");
+            location.reload(); // Recharge la page pour actualiser la liste
+        } catch (e) {
+            alert("Erreur lors de la suppression. Vérifiez vos droits d'accès.");
+        }
+    }
+};
+
+// Fonction pour transférer un agent
+window.transferAgent = async function(id, name) {
+    const newId = prompt(`Entrez l'ID du nouveau bureau pour transférer ${name} :`);
+    if (newId && !isNaN(newId)) {
+        try {
+            await grist.docApi.updateRecords(TABLE_AGENTS, [
+                { id: id, fields: { [COL_AGENT_STRUCT_REF]: parseInt(newId) } }
+            ]);
+            alert("Transfert effectué.");
+            location.reload();
+        } catch (e) {
+            alert("Erreur lors du transfert.");
+        }
+    }
+};
