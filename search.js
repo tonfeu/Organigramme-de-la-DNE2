@@ -407,6 +407,13 @@ function generateAgentCardHtml(agent) {
     // Génération d'un ID unique pour ce bloc
     const uniqueId = `agent-${Math.floor(Math.random() * 1000000)}`;
 
+    // Préparation de la liste des structures pour le transfert
+    // On trie par nom de bureau pour que ce soit plus simple à trouver
+    const optionsStructures = allStructures
+        .sort((a, b) => (a[COL_STRUCT_LIBELLE] || "").localeCompare(b[COL_STRUCT_LIBELLE] || ""))
+        .map(s => `<option value="${s.id}">${safeHtml(s[COL_STRUCT_LIBELLE] || s[COL_STRUCT_CODE])}</option>`)
+        .join('');
+
     return `
     <div class="fr-col-12 fr-col-md-6">
         <div class="agent-accordion" id="${uniqueId}">
@@ -425,15 +432,29 @@ function generateAgentCardHtml(agent) {
                 <span class="fr-icon-arrow-down-s-line agent-arrow"></span>
             </div>
 
-            <div id="${uniqueId}-admin" style="display:none; background: #f6f6f6; padding: 0.75rem; border-bottom: 1px solid #ddd; justify-content: center; gap: 1rem;">
-                <button class="fr-btn fr-btn--sm fr-btn--secondary fr-icon-refresh-line" 
-                        onclick="event.stopPropagation(); window.transferAgent(${agent.id}, '${nom.replace(/'/g, "\\'")}')">
-                    Transférer
-                </button>
-                <button class="fr-btn fr-btn--sm fr-btn--secondary fr-btn--secondary--error fr-icon-delete-line" 
-                        onclick="event.stopPropagation(); window.deleteAgent(${agent.id}, '${nom.replace(/'/g, "\\'")}')">
-                    Supprimer
-                </button>
+            <div id="${uniqueId}-admin" style="display:none; background: #f6f6f6; padding: 1rem; border-bottom: 1px solid #ddd;">
+                <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                    
+                    <div style="display: flex; gap: 0.5rem; align-items: flex-end;">
+                        <div class="fr-select-group" style="margin-bottom: 0; flex-grow: 1;">
+                            <label class="fr-label" style="font-size: 0.75rem;">Transférer vers :</label>
+                            <select class="fr-select fr-select--sm" id="select-transfer-${uniqueId}" onclick="event.stopPropagation()">
+                                <option value="" selected disabled>Choisir un bureau...</option>
+                                ${optionsStructures}
+                            </select>
+                        </div>
+                        <button class="fr-btn fr-btn--sm fr-icon-check-line" 
+                                onclick="event.stopPropagation(); window.executeTransfer(${agent.id}, '${uniqueId}', '${nom.replace(/'/g, "\\'")}')"
+                                title="Valider le transfert"></button>
+                    </div>
+
+                    <div style="text-align: right;">
+                        <button class="fr-btn fr-btn--sm fr-btn--secondary fr-btn--secondary--error fr-icon-delete-line" 
+                                onclick="event.stopPropagation(); window.deleteAgent(${agent.id}, '${nom.replace(/'/g, "\\'")}')">
+                            Supprimer l'agent
+                        </button>
+                    </div>
+                </div>
             </div>
 
             <div class="agent-details">
@@ -450,7 +471,6 @@ function generateAgentCardHtml(agent) {
         </div>
     </div>`;
 }
-
 function renderResults(agents, title) {
     const container = document.getElementById('resultArea');
 
@@ -523,17 +543,33 @@ async function deleteAgent(agentId, agentName) {
     }
 }
 // Fonction pour transférer un agent
-window.transferAgent = async function(id, name) {
-    const newId = prompt(`Entrez l'ID du nouveau bureau pour transférer ${name} :`);
-    if (newId && !isNaN(newId)) {
-        try {
-            await grist.docApi.updateRecords(TABLE_AGENTS, [
-                { id: id, fields: { [COL_AGENT_STRUCT_REF]: parseInt(newId) } }
-            ]);
-            alert("Transfert effectué.");
-            location.reload();
-        } catch (e) {
-            alert("Erreur lors du transfert.");
-        }
+window.executeTransfer = async function(agentId, uniqueId, agentName) {
+    const selectEl = document.getElementById(`select-transfer-${uniqueId}`);
+    const newStructureId = parseInt(selectEl.value);
+
+    if (!newStructureId) {
+        alert("Veuillez sélectionner un bureau de destination.");
+        return;
+    }
+
+    if (!confirm(`Confirmer le transfert de ${agentName} ?`)) return;
+
+    try {
+        await grist.docApi.applyUserActions([
+            ["UpdateRecord", TABLE_AGENTS, agentId, {
+                [COL_AGENT_STRUCT_REF]: newStructureId 
+            }]
+        ]);
+
+        alert("Transfert réussi.");
+        
+        // Mise à jour locale pour éviter de tout recharger
+        const agent = allAgents.find(a => a.id === agentId);
+        if (agent) agent[COL_AGENT_STRUCT_REF] = newStructureId;
+        
+        performSearch(); // Rafraîchit l'affichage
+    } catch (error) {
+        console.error("Erreur transfert:", error);
+        alert("Erreur lors du transfert. Vérifiez vos droits d'accès.");
     }
 };
