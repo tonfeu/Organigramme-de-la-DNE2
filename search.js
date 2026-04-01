@@ -480,25 +480,27 @@ window.toggleMgmt = function(adminId) {
     }
 };
 
-// Fonction pour supprimer un agent
 async function deleteAgent(agentId, agentName) {
-    if (!confirm(`Voulez-vous vraiment supprimer l'agent ${agentName} ?`)) return;
+    const confirmation = confirm(`Êtes-vous sûr de vouloir supprimer l'agent "${agentName}" ? Cette action est irréversible dans Grist.`);
+    
+    if (!confirmation) return;
 
     try {
-        // Appel à l'API Grist pour supprimer l'enregistrement
+        // Suppression dans Grist
         await grist.docApi.deleteRecords(TABLE_AGENTS, [agentId]);
         
-        // Rafraîchir l'affichage localement
+        // Mise à jour locale de la liste
         allAgents = allAgents.filter(a => a.id !== agentId);
-        performSearch(); // Relance la recherche pour mettre à jour la liste
         
-        alert("Agent supprimé avec succès.");
+        // Rafraîchissement de l'affichage
+        performSearch(); 
+        
+        alert("L'agent a été supprimé avec succès.");
     } catch (error) {
-        console.error("Erreur de suppression:", error);
-        alert("Erreur lors de la suppression. Vérifiez que l'accès est réglé sur 'Full' dans Grist.");
+        console.error("Erreur Grist:", error);
+        alert("Erreur lors de la suppression. Vérifiez que le widget est bien configuré sur 'Access Level: Full'.");
     }
 }
-
 // Fonction pour transférer un agent
 window.transferAgent = async function(id, name) {
     const newId = prompt(`Entrez l'ID du nouveau bureau pour transférer ${name} :`);
