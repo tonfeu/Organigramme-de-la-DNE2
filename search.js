@@ -573,3 +573,28 @@ window.executeTransfer = async function(agentId, uniqueId, agentName) {
         alert("Erreur lors du transfert. Vérifiez vos droits d'accès.");
     }
 };
+
+// ==========================================
+// GESTION DE L'INTERFACE (UI)
+// ==========================================
+
+/**
+ * Affiche ou masque le bandeau d'administration (Transfert/Suppression)
+ */
+window.toggleMgmt = function(id) {
+    const el = document.getElementById(id);
+    if (el) {
+        // Alterne entre l'affichage et le masquage
+        el.style.display = (el.style.display === 'none' || el.style.display === '') ? 'block' : 'none';
+    }
+};
+
+/**
+ * Gère l'ouverture et la fermeture de l'accordéon d'un agent
+ */
+window.toggleAgent = function(id) {
+    const el = document.getElementById(id);
+    if (el) {
+        el.classList.toggle('open');
+    }
+};
