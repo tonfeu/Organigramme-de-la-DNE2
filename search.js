@@ -695,3 +695,149 @@ window.toggleAddForm = function() {
     const form = document.getElementById('add-agent-form');
     form.style.display = (form.style.display === 'none') ? 'block' : 'none';
 };
+// --- LOGIQUE ADMIN INDÉPENDANTE ---
+
+// Cette fonction va "brancher" les boutons une fois que la page est prête
+function setupAdminEvents() {
+    const btnShow = document.getElementById('btn-show-form');
+    const btnCancel = document.getElementById('btn-cancel');
+    const btnSave = document.getElementById('btn-save');
+
+    if (btnShow) {
+        btnShow.onclick = () => {
+            console.log("Ouverture du formulaire...");
+            document.getElementById('form-creation-agent').style.display = 'block';
+        };
+    }
+
+    if (btnCancel) {
+        btnCancel.onclick = () => {
+            document.getElementById('form-creation-agent').style.display = 'none';
+        };
+    }
+
+    if (btnSave) {
+        btnSave.onclick = async () => {
+            await handleSaveAgent();
+        };
+    }
+}
+
+// 2. Remplissage du menu des structures
+const populateAdminSelect = () => {
+    const select = document.getElementById('field-struct');
+    if (!select || !window.allStructures || allStructures.length === 0) return;
+
+    let html = '<option value="" disabled selected>Choisir une structure...</option>';
+    allStructures.forEach(s => {
+        const label = s[COL_STRUCT_LIBELLE] || s[COL_STRUCT_CODE] || "Sans nom";
+        html += `<option value="${s.id}">${label}</option>`;
+    });
+    select.innerHTML = html;
+};
+
+// 3. La logique de sauvegarde isolée
+async function handleSaveAgent() {
+    const data = {
+        prenom: document.getElementById('field-prenom').value.trim(),
+        nom: document.getElementById('field-nom').value.trim(),
+        fct: document.getElementById('field-fct').value.trim(),
+        struct: parseInt(document.getElementById('field-struct').value),
+        form: document.getElementById('field-formation').value.trim()
+    };
+
+    if (!data.nom || isNaN(data.struct)) {
+        alert("⚠️ Le NOM et la STRUCTURE sont obligatoires.");
+        return;
+    }
+
+    try {
+        await grist.docApi.applyUserActions([
+            ["AddRecord", TABLE_AGENTS, null, {
+                [COL_AGENT_PRENOM]: data.prenom,
+                [COL_AGENT_NOM]: data.nom,
+                [COL_AGENT_FONCTION]: data.fct,
+                [COL_AGENT_STRUCT_REF]: data.struct,
+                "Formations": data.form 
+            }]
+        ]);
+        alert("✅ Agent ajouté avec succès !");
+        location.reload(); 
+    } catch (err) {
+        console.error("Erreur Grist:", err);
+        alert("❌ Erreur : Vérifiez vos droits et les noms de colonnes.");
+    }
+}
+
+// --- LANCEMENT AUTOMATIQUE ---
+// On vérifie la présence des éléments toutes les 500ms jusqu'à ce qu'ils soient là
+const adminInitInterval = setInterval(() => {
+    if (document.getElementById('btn-show-form')) {
+        setupAdminEvents();
+        if (window.allStructures && window.allStructures.length > 0) {
+            populateAdminSelect();
+            clearInterval(adminInitInterval);
+            console.log("Admin Panel prêt !");
+        }
+    }
+}, 500);
+
+// ==========================================
+// LOGIQUE ADMINISTRATION (INSERTION AGENT)
+// ==========================================
+
+// 1. Fonction pour afficher/masquer
+window.toggleForm = function() {
+    const form = document.getElementById('form-creation-agent');
+    if (form) {
+        form.style.display = (form.style.display === 'none' || form.style.display === '') ? 'block' : 'none';
+    }
+};
+
+// 2. Fonction de sauvegarde
+window.saveNewAgent = async function() {
+    const data = {
+        prenom: document.getElementById('field-prenom').value.trim(),
+        nom: document.getElementById('field-nom').value.trim(),
+        fct: document.getElementById('field-fct').value.trim(),
+        struct: parseInt(document.getElementById('field-struct').value),
+        form: document.getElementById('field-formation').value.trim()
+    };
+
+    if (!data.nom || isNaN(data.struct)) {
+        alert("⚠️ Le NOM et la STRUCTURE sont obligatoires.");
+        return;
+    }
+
+    try {
+        await grist.docApi.applyUserActions([
+            ["AddRecord", TABLE_AGENTS, null, {
+                [COL_AGENT_PRENOM]: data.prenom,
+                [COL_AGENT_NOM]: data.nom,
+                [COL_AGENT_FONCTION]: data.fct,
+                [COL_AGENT_STRUCT_REF]: data.struct,
+                "Formations": data.form // Vérifie si la colonne s'appelle bien ainsi dans Grist
+            }]
+        ]);
+        alert("✅ Agent ajouté avec succès !");
+        location.reload(); 
+    } catch (err) {
+        console.error("Erreur Grist:", err);
+        alert("❌ Erreur : Vérifiez que vous avez l'accès 'Full Access' dans Grist.");
+    }
+};
+
+// 3. Remplissage automatique du menu des structures
+setInterval(() => {
+    const select = document.getElementById('field-struct');
+    // On utilise 'allStructures' qui est défini dans ton search.js
+    if (select && select.options.length <= 1 && typeof allStructures !== 'undefined' && allStructures.length > 0) {
+        let html = '<option value="" disabled selected>Choisir une structure...</option>';
+        allStructures.forEach(s => {
+            const label = s[COL_STRUCT_LIBELLE] || "Sans nom";
+            html += `<option value="${s.id}">${label}</option>`;
+        });
+        select.innerHTML = html;
+        console.log("Menu structures admin mis à jour.");
+    }
+}, 1500);
