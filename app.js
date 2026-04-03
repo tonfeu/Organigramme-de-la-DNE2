@@ -552,16 +552,3 @@ const adminInitInterval = setInterval(() => {
 }, 500);
 
 
-// --- 2. REMPLISSAGE AUTO (En bas du fichier) ---
-setInterval(() => {
-    const select = document.getElementById('field-struct');
-    // Si le select est vide et que allStructures contient des données
-    if (select && select.options.length <= 1 && window.allStructures && allStructures.length > 0) {
-        let html = '<option value="" disabled selected>Choisir une structure...</option>';
-        allStructures.forEach(s => {
-            html += `<option value="${s.id}">${s.Libelle || s.Nom || "Sans nom"}</option>`;
-        });
-        select.innerHTML = html;
-        console.log("Structures chargées dans le formulaire !");
-    }
-}, 1000);
