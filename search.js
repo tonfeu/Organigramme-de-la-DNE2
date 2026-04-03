@@ -601,72 +601,43 @@ window.executeTransfer = async function(agentId, uniqueId, agentName) {
         alert("Erreur lors du transfert. Vérifiez vos droits d'accès.");
     }
 };
-// ==========================================
-// GESTION DE L'INTERFACE (UI) & ACTIONS
-// ==========================================
+// --- GESTION DU FORMULAIRE D'AJOUT ---
 
-// Affiche/Masque le bandeau gris d'administration
-window.toggleMgmt = function(id) {
-    const el = document.getElementById(id);
-    if (el) {
-        el.style.display = (el.style.display === 'none' || el.style.display === '') ? 'flex' : 'none';
-    }
+// 1. Ouvrir / Fermer le formulaire
+document.getElementById('btn-open-form')?.addEventListener('click', () => {
+    document.getElementById('add-agent-form').style.display = 'block';
+});
+
+document.getElementById('btn-close-form')?.addEventListener('click', () => {
+    document.getElementById('add-agent-form').style.display = 'none';
+});
+
+// 2. Remplir le select du formulaire (Appelé après le chargement des données)
+window.prepareAddForm = function() {
+    const select = document.getElementById('new-struct-select');
+    if (!select || allStructures.length === 0) return;
+
+    let html = '<option value="" disabled selected>Choisir une destination...</option>';
+    allStructures.forEach(s => {
+        const label = s[COL_STRUCT_LIBELLE] || s[COL_STRUCT_CODE];
+        html += `<option value="${s.id}">${label}</option>`;
+    });
+    select.innerHTML = html;
 };
 
-// Gère l'ouverture de l'accordéon
-window.toggleAgent = function(id) {
-    const el = document.getElementById(id);
-    if (el) {
-        el.classList.toggle('open');
-    }
-};
+// 3. Action d'enregistrement
+document.getElementById('btn-save-agent')?.addEventListener('click', async () => {
+    const prenom = document.getElementById('new-prenom').value.trim();
+    const nom = document.getElementById('new-nom').value.trim();
+    const fct = document.getElementById('new-fct').value.trim();
+    const structId = parseInt(document.getElementById('new-struct-select').value);
 
-// LA NOUVELLE FONCTION (Remplace celle avec le prompt)
-window.executeTransfer = async function(agentId, uniqueId, agentName) {
-    const selectEl = document.getElementById(`select-transfer-${uniqueId}`);
-    const newStructureId = parseInt(selectEl.value);
-
-    if (!newStructureId) {
-        alert("Veuillez sélectionner un bureau dans la liste avant de valider.");
-        return;
-    }
-
-    if (!confirm(`Transférer ${agentName} vers cette structure ?`)) return;
-
-    try {
-        await grist.docApi.applyUserActions([
-            ["UpdateRecord", TABLE_AGENTS, agentId, {
-                [COL_AGENT_STRUCT_REF]: newStructureId 
-            }]
-        ]);
-
-        alert("Transfert réussi !");
-        
-        // Mise à jour locale pour éviter le rechargement
-        const agent = allAgents.find(a => a.id === agentId);
-        if (agent) agent[COL_AGENT_STRUCT_REF] = newStructureId;
-        
-        performSearch(); 
-    } catch (error) {
-        console.error("Erreur transfert:", error);
-        alert("Erreur : Vérifiez que vous êtes bien en accès 'Full'.");
-    }
-};
-window.submitNewAgent = async function() {
-    // 1. Récupération des valeurs
-    const prenom = document.getElementById('new-agent-prenom').value.trim();
-    const nom = document.getElementById('new-agent-nom').value.trim();
-    const fct = document.getElementById('new-agent-fct').value.trim();
-    const structId = parseInt(document.getElementById('new-agent-struct').value);
-
-    // 2. Validation minimale
     if (!nom || !structId) {
-        alert("Le nom et la structure sont obligatoires.");
+        alert("Le nom et la structure sont obligatoires !");
         return;
     }
 
     try {
-        // 3. Envoi à Grist via AddRecord
         await grist.docApi.applyUserActions([
             ["AddRecord", TABLE_AGENTS, null, {
                 [COL_AGENT_PRENOM]: prenom,
@@ -676,22 +647,10 @@ window.submitNewAgent = async function() {
             }]
         ]);
 
-        alert("Agent ajouté avec succès !");
-        
-        // 4. Nettoyage et rafraîchissement
-        document.querySelectorAll('#add-agent-form input').forEach(i => i.value = '');
-        window.toggleAddForm();
-        
-        // Optionnel : Recharger les données pour voir le nouvel agent
-        location.reload(); 
-
-    } catch (error) {
-        console.error("Erreur ajout agent:", error);
-        alert("Impossible d'ajouter l'agent. Vérifiez vos droits.");
+        alert("Agent ajouté !");
+        location.reload(); // Recharge pour voir le résultat
+    } catch (err) {
+        console.error(err);
+        alert("Erreur Grist : Vérifiez vos droits d'accès (Full Access requis).");
     }
-};
-
-window.toggleAddForm = function() {
-    const form = document.getElementById('add-agent-form');
-    form.style.display = (form.style.display === 'none') ? 'block' : 'none';
-};
+});

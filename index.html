@@ -231,23 +231,43 @@
         </div>
     </div>
 
-    <div id="admin-add-section" style="display:none;" class="fr-mb-2w">
-        <button class="fr-btn fr-btn--sm fr-btn--icon-left fr-icon-add-line" onclick="window.toggleAddForm()">
-            Ajouter un agent
-        </button>
-    </div>
-
-    <div id="add-agent-form" style="display:none; background: #f6f6f6; padding: 1.5rem; border: 1px dashed #ccc;" class="fr-mb-4w">
+    <div class="fr-container fr-my-2w">
+    <div id="admin-controls" style="display: block !important; border: 1px solid #000091; padding: 1rem; background-color: #f5f5fe;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h4 class="fr-h6 fr-mb-0">Administration des agents</h4>
+            <button class="fr-btn fr-btn--sm fr-icon-add-line fr-btn--icon-left" id="btn-open-form">
+                Ajouter un agent
+            </button>
         </div>
 
-    <hr class="fr-pb-2w">
-
-    <div id="loadingMessage" style="display:none;" class="fr-alert fr-alert--info">
-        <p>Chargement des données...</p>
-    </div>
-
-    <div id="resultArea" class="fr-grid-row fr-grid-row--gutters">
+        <div id="add-agent-form" style="display: none; margin-top: 1.5rem; border-top: 1px solid #ddd; pt-2w;">
+            <div class="fr-grid-row fr-grid-row--gutters">
+                <div class="fr-col-12 fr-col-md-4">
+                    <label class="fr-label">Prénom</label>
+                    <input class="fr-input" type="text" id="new-prenom">
+                </div>
+                <div class="fr-col-12 fr-col-md-4">
+                    <label class="fr-label">Nom</label>
+                    <input class="fr-input" type="text" id="new-nom">
+                </div>
+                <div class="fr-col-12 fr-col-md-4">
+                    <label class="fr-label">Fonction</label>
+                    <input class="fr-input" type="text" id="new-fct">
+                </div>
+                <div class="fr-col-12">
+                    <label class="fr-label">Bureau / Structure</label>
+                    <select class="fr-select" id="new-struct-select">
+                        <option value="">Chargement des structures...</option>
+                    </select>
+                </div>
+            </div>
+            <div class="fr-mt-2w" style="text-align: right;">
+                <button class="fr-btn fr-btn--secondary fr-mr-2w" id="btn-close-form">Annuler</button>
+                <button class="fr-btn" id="btn-save-agent">Enregistrer dans Grist</button>
+            </div>
         </div>
+    </div>
+</div>
 
 </div>
     </main>
