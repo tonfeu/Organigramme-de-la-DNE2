@@ -422,3 +422,92 @@ function initQuickSearch() {
         }
     }
 }
+
+
+
+// --- LOGIQUE ADMIN INDÉPENDANTE ---
+
+// Cette fonction va "brancher" les boutons une fois que la page est prête
+function setupAdminEvents() {
+    const btnShow = document.getElementById('btn-show-form');
+    const btnCancel = document.getElementById('btn-cancel');
+    const btnSave = document.getElementById('btn-save');
+
+    if (btnShow) {
+        btnShow.onclick = () => {
+            console.log("Ouverture du formulaire...");
+            document.getElementById('form-creation-agent').style.display = 'block';
+        };
+    }
+
+    if (btnCancel) {
+        btnCancel.onclick = () => {
+            document.getElementById('form-creation-agent').style.display = 'none';
+        };
+    }
+
+    if (btnSave) {
+        btnSave.onclick = async () => {
+            await handleSaveAgent();
+        };
+    }
+}
+
+// 2. Remplissage du menu des structures
+const populateAdminSelect = () => {
+    const select = document.getElementById('field-struct');
+    if (!select || !window.allStructures || allStructures.length === 0) return;
+
+    let html = '<option value="" disabled selected>Choisir une structure...</option>';
+    allStructures.forEach(s => {
+        const label = s[COL_STRUCT_LIBELLE] || s[COL_STRUCT_CODE] || "Sans nom";
+        html += `<option value="${s.id}">${label}</option>`;
+    });
+    select.innerHTML = html;
+};
+
+// 3. La logique de sauvegarde isolée
+async function handleSaveAgent() {
+    const data = {
+        prenom: document.getElementById('field-prenom').value.trim(),
+        nom: document.getElementById('field-nom').value.trim(),
+        fct: document.getElementById('field-fct').value.trim(),
+        struct: parseInt(document.getElementById('field-struct').value),
+        form: document.getElementById('field-formation').value.trim()
+    };
+
+    if (!data.nom || isNaN(data.struct)) {
+        alert("⚠️ Le NOM et la STRUCTURE sont obligatoires.");
+        return;
+    }
+
+    try {
+        await grist.docApi.applyUserActions([
+            ["AddRecord", TABLE_AGENTS, null, {
+                [COL_AGENT_PRENOM]: data.prenom,
+                [COL_AGENT_NOM]: data.nom,
+                [COL_AGENT_FONCTION]: data.fct,
+                [COL_AGENT_STRUCT_REF]: data.struct,
+                "Formations": data.form 
+            }]
+        ]);
+        alert("✅ Agent ajouté avec succès !");
+        location.reload(); 
+    } catch (err) {
+        console.error("Erreur Grist:", err);
+        alert("❌ Erreur : Vérifiez vos droits et les noms de colonnes.");
+    }
+}
+
+// --- LANCEMENT AUTOMATIQUE ---
+// On vérifie la présence des éléments toutes les 500ms jusqu'à ce qu'ils soient là
+const adminInitInterval = setInterval(() => {
+    if (document.getElementById('btn-show-form')) {
+        setupAdminEvents();
+        if (window.allStructures && window.allStructures.length > 0) {
+            populateAdminSelect();
+            clearInterval(adminInitInterval);
+            console.log("Admin Panel prêt !");
+        }
+    }
+}, 500);
