@@ -33,6 +33,43 @@
 </head>
 
 <body>
+    <section class="fr-container fr-my-4w" id="admin-panel" style="border: 2px solid #000091; padding: 1.5rem; background-color: #f5f5fe;">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h2 class="fr-h4 fr-mb-0">🛠️ Gestion du Personnel</h2>
+        <button class="fr-btn fr-icon-add-line fr-btn--icon-left" id="btn-show-form">Nouvel Agent</button>
+    </div>
+
+    <div id="form-creation-agent" style="display: none; margin-top: 2w; padding-top: 2w; border-top: 1px solid #ddd;">
+        <div class="fr-grid-row fr-grid-row--gutters">
+            <div class="fr-col-12 fr-col-md-4">
+                <label class="fr-label">Prénom</label>
+                <input class="fr-input" id="field-prenom" type="text">
+            </div>
+            <div class="fr-col-12 fr-col-md-4">
+                <label class="fr-label">Nom</label>
+                <input class="fr-input" id="field-nom" type="text">
+            </div>
+            <div class="fr-col-12 fr-col-md-4">
+                <label class="fr-label">Poste / Fonction</label>
+                <input class="fr-input" id="field-fct" type="text">
+            </div>
+            <div class="fr-col-12 fr-col-md-6">
+                <label class="fr-label">Affectation (Structure)</label>
+                <select class="fr-select" id="field-struct">
+                    <option value="">Chargement des bureaux...</option>
+                </select>
+            </div>
+            <div class="fr-col-12 fr-col-md-6">
+                <label class="fr-label">Formation Principale</label>
+                <input class="fr-input" id="field-formation" type="text" placeholder="Ex: SST, Électrique, etc.">
+            </div>
+        </div>
+        <div class="fr-mt-3w" style="text-align: right;">
+            <button class="fr-btn fr-btn--secondary fr-mr-2w" id="btn-cancel">Annuler</button>
+            <button class="fr-btn" id="btn-save">Enregistrer dans la base</button>
+        </div>
+    </div>
+</section>
 
     <!-- ========================= -->
     <!-- EN-TÊTE (HEADER GLOBAL) -->
@@ -231,43 +268,7 @@
         </div>
     </div>
 
-    <div class="fr-container fr-my-2w">
-    <div id="admin-controls" style="display: block !important; border: 1px solid #000091; padding: 1rem; background-color: #f5f5fe;">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-            <h4 class="fr-h6 fr-mb-0">Administration des agents</h4>
-            <button class="fr-btn fr-btn--sm fr-icon-add-line fr-btn--icon-left" id="btn-open-form">
-                Ajouter un agent
-            </button>
-        </div>
-
-        <div id="add-agent-form" style="display: none; margin-top: 1.5rem; border-top: 1px solid #ddd; pt-2w;">
-            <div class="fr-grid-row fr-grid-row--gutters">
-                <div class="fr-col-12 fr-col-md-4">
-                    <label class="fr-label">Prénom</label>
-                    <input class="fr-input" type="text" id="new-prenom">
-                </div>
-                <div class="fr-col-12 fr-col-md-4">
-                    <label class="fr-label">Nom</label>
-                    <input class="fr-input" type="text" id="new-nom">
-                </div>
-                <div class="fr-col-12 fr-col-md-4">
-                    <label class="fr-label">Fonction</label>
-                    <input class="fr-input" type="text" id="new-fct">
-                </div>
-                <div class="fr-col-12">
-                    <label class="fr-label">Bureau / Structure</label>
-                    <select class="fr-select" id="new-struct-select">
-                        <option value="">Chargement des structures...</option>
-                    </select>
-                </div>
-            </div>
-            <div class="fr-mt-2w" style="text-align: right;">
-                <button class="fr-btn fr-btn--secondary fr-mr-2w" id="btn-close-form">Annuler</button>
-                <button class="fr-btn" id="btn-save-agent">Enregistrer dans Grist</button>
-            </div>
-        </div>
-    </div>
-</div>
+    
 
 </div>
     </main>

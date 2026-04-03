@@ -695,3 +695,69 @@ window.toggleAddForm = function() {
     const form = document.getElementById('add-agent-form');
     form.style.display = (form.style.display === 'none') ? 'block' : 'none';
 };
+
+// --- LOGIQUE ADMIN INDÉPENDANTE ---
+
+// 1. Gestion de l'affichage
+document.getElementById('btn-show-form')?.addEventListener('click', () => {
+    document.getElementById('form-creation-agent').style.display = 'block';
+});
+
+document.getElementById('btn-cancel')?.addEventListener('click', () => {
+    document.getElementById('form-creation-agent').style.display = 'none';
+});
+
+// 2. Remplissage du menu des structures (Boucle de sécurité)
+const populateAdminSelect = () => {
+    const select = document.getElementById('field-struct');
+    if (!select || !window.allStructures || allStructures.length === 0) return;
+
+    let html = '<option value="" disabled selected>Choisir une structure...</option>';
+    allStructures.forEach(s => {
+        const label = s[COL_STRUCT_LIBELLE] || s[COL_STRUCT_CODE] || "Sans nom";
+        html += `<option value="${s.id}">${label}</option>`;
+    });
+    select.innerHTML = html;
+};
+
+// On tente de remplir le select toutes les secondes tant qu'il est vide
+const selectInterval = setInterval(() => {
+    if (window.allStructures && window.allStructures.length > 0) {
+        populateAdminSelect();
+        clearInterval(selectInterval);
+    }
+}, 1000);
+
+// 3. Sauvegarde de l'agent et de ses formations
+document.getElementById('btn-save')?.addEventListener('click', async () => {
+    const data = {
+        prenom: document.getElementById('field-prenom').value.trim(),
+        nom: document.getElementById('field-nom').value.trim(),
+        fct: document.getElementById('field-fct').value.trim(),
+        struct: parseInt(document.getElementById('field-struct').value),
+        form: document.getElementById('field-formation').value.trim()
+    };
+
+    if (!data.nom || !data.struct) {
+        alert("⚠️ Le NOM et la STRUCTURE sont obligatoires.");
+        return;
+    }
+
+    try {
+        await grist.docApi.applyUserActions([
+            ["AddRecord", TABLE_AGENTS, null, {
+                [COL_AGENT_PRENOM]: data.prenom,
+                [COL_AGENT_NOM]: data.nom,
+                [COL_AGENT_FONCTION]: data.fct,
+                [COL_AGENT_STRUCT_REF]: data.struct,
+                "Formations": data.form // Assurez-vous que le nom de colonne 'Formations' existe dans Grist
+            }]
+        ]);
+
+        alert("✅ Agent ajouté avec succès !");
+        location.reload(); 
+    } catch (err) {
+        console.error("Erreur Grist:", err);
+        alert("❌ Erreur : Vérifiez que vous avez les droits 'Full Access' et que les noms de colonnes sont corrects.");
+    }
+});
