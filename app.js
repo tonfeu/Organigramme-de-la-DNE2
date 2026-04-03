@@ -1,288 +1,158 @@
-// ==========================================
-// INITIALISATION
-// ==========================================
-// Ce fichier gère toute la logique métier de l'organigramme DNE :
-// - Récupération des données depuis Grist
-// - Transformation et optimisation des données
-// - Rendu dynamique de l'interface
-// - Gestion des interactions utilisateur (recherche, modale, etc.)
+/**
+ * ==========================================
+ * INITIALISATION & LOGIQUE MÉTIER - app.js
+ * ==========================================
+ */
 
-// Note : Les constantes (noms de colonnes, tables, etc.) sont définies dans utils.js
-
-// Initialisation du plugin Grist avec accès en lecture
+// Initialisation du plugin Grist
 grist.ready({ 
-  requiredAccess: 'full',
-  onRecords: function(records) {
-    // Cette fonction optionnelle peut aider à stabiliser la connexion
-  }
+    requiredAccess: 'full'
 });
 
-// --- 1. FONCTIONS GLOBALES (En haut du fichier) ---
-window.toggleForm = function() {
-    const form = document.getElementById('form-creation-agent');
-    if (form) {
-        form.style.display = (form.style.display === 'none' || form.style.display === '') ? 'block' : 'none';
-    }
-};
-
-window.saveNewAgent = async function() {
-    const data = {
-        prenom: document.getElementById('field-prenom').value.trim(),
-        nom: document.getElementById('field-nom').value.trim(),
-        fct: document.getElementById('field-fct').value.trim(),
-        struct: parseInt(document.getElementById('field-struct').value),
-        form: document.getElementById('field-formation').value.trim()
-    };
-
-    if (!data.nom || isNaN(data.struct)) {
-        alert("⚠️ Le NOM et la STRUCTURE sont obligatoires.");
-        return;
-    }
-
-    try {
-        await grist.docApi.applyUserActions([
-            ["AddRecord", "Base_Agent", null, {
-                "Prenom": data.prenom,
-                "Nom": data.nom,
-                "Fonction": data.fct,
-                "Structure_de_l_agent": data.struct,
-                "Formations": data.form
-            }]
-        ]);
-        alert("✅ Agent ajouté !");
-        location.reload();
-    } catch (err) {
-        alert("❌ Erreur Grist : " + err.message);
-    }
-};
-
-// Lancement de la fonction principale après chargement du DOM
-document.addEventListener('DOMContentLoaded', init);
-
 // Variables globales (cache des données)
-let allAgents = [];              // Liste complète des agents
-let allStructures = [];          // Liste des structures (bureaux)
-let structureMap = new Map();    // Accès rapide aux structures (O(1))
-let agentsHierarchyMap = new Map(); // Accès rapide à la hiérarchie des agents
+let allAgents = [];
+let allStructures = [];
+let structureMap = new Map();
+let agentsHierarchyMap = new Map();
+
+// Lancement au chargement du DOM
+document.addEventListener('DOMContentLoaded', init);
 
 /**
  * Fonction principale d'initialisation
- * - Charge les données
- * - Prépare les structures
- * - Lance le rendu de l'interface
  */
 async function init() {
     try {
-        console.log("Chargement Organigramme ...");
+        console.log("🚀 Chargement de l'Organigramme DNE...");
 
-        // ==========================================
-        // 1. RÉCUPÉRATION DES DONNÉES GRIST
-        // ==========================================
+        // 1. RÉCUPÉRATION DES DONNÉES
         const tables = [TABLE_AGENTS, TABLE_STRUCTURES, TABLE_CONFIG_LOGO];
         const data = {};
 
-        // Chargement parallèle des tables
         await Promise.all(tables.map(async (name) => {
             try {
                 const result = await grist.docApi.fetchTable(name);
-
-                // Transformation colonnes -> lignes
                 data[name] = window.transformColsToRows(result);
             } catch (err) {
-                console.warn(`Table ${name} non trouvée ou inaccessible.`, err);
-
-                // Fallback si la table n'existe pas
+                console.warn(`⚠️ Table ${name} inaccessible.`, err);
                 data[name] = [];
             }
-
-            
         }));
 
-
-
-
-        // ==========================================
-        // 2. PRÉPARATION ET OPTIMISATION DES DONNÉES
-        // ==========================================
-
-        // Enrichissement des agents (normalisation des noms, etc.)
+        // 2. PRÉPARATION DES DONNÉES
         allAgents = window.enrichAgentsData(data[TABLE_AGENTS]);
-
-        // Création d'un index pour la hiérarchie (recherche rapide)
         agentsHierarchyMap = window.createAgentsHierarchyMap(allAgents);
-
-        // Structures (bureaux)
+        
         allStructures = data[TABLE_STRUCTURES];
-
-        // Index des structures (accès rapide par ID)
         structureMap = window.createStructureMap(allStructures);
 
-        
-        console.log("Agents :", allAgents);
-        console.log("Structures :", allStructures);
-
-        // ==========================================
-        // 3. CONFIGURATION DU LOGO
-        // ==========================================
+        // 3. CONFIGURATION UI
         applyLogoConfig(data[TABLE_CONFIG_LOGO]);
+        renderTopZone();   
+        renderColumns();   
+        initQuickSearch(); 
 
-        // ==========================================
-        // 4. RENDU DE L'INTERFACE
-        // ==========================================
-
-        renderTopZone();   // Zone supérieure (direction, cabinet...)
-        renderColumns();   // Colonnes principales
-        initQuickSearch(); // Recherche rapide
-
-        // ==========================================
-        // 5. EXPOSITION DES DONNÉES (POUR PDF / AUTRES MODULES)
-        // ==========================================
+        // 4. EXPOSITION POUR MODULES EXTERNES (PDF, etc.)
         window.getOrganigrammeData = () => ({
             agents: allAgents,
-            structures: allStructures
+            structures: allStructures,
+            structureMap: structureMap
         });
 
     } catch (e) {
-        console.error("ERREUR :", e);
-
-        // Affichage d'une erreur dans l'interface
-        document.querySelector('.main-grid').innerHTML =
-            `<div class="fr-alert fr-alert--error">${e.message}</div>`;
+        console.error("❌ ERREUR CRITIQUE :", e);
+        const grid = document.querySelector('.main-grid');
+        if (grid) grid.innerHTML = `<div class="fr-alert fr-alert--error"><p>${e.message}</p></div>`;
     }
-} 
+}
 
-
-
-// ==========================================
-// CONFIGURATION LOGO
-// ==========================================
 /**
- * Applique la configuration du logo depuis Grist
- * - Masquage du logo
- * - Personnalisation du texte
+ * Applique la personnalisation du logo (Texte / Visibilité)
  */
 function applyLogoConfig(configData) {
-
-    // Si aucune configuration, on ne fait rien
     if (!configData || configData.length === 0) return;
-
-    // On prend la première ligne de config
     const configRow = configData[0];
-
     const logoContainer = document.querySelector('.fr-header__logo');
     if (!logoContainer) return;
 
-    // 1. Masquer le logo
     if (configRow[COL_CONFIG_MASQUER_LOGO]) {
         logoContainer.style.display = 'none';
         return;
     }
 
-    // 2. Modifier le texte du logo
-    const customText = safeStr(configRow[COL_CONFIG_TEXTE_LOGO]).trim();
-
+    const customText = window.safeStr(configRow[COL_CONFIG_TEXTE_LOGO]).trim();
     if (customText) {
         const pLogo = logoContainer.querySelector('.fr-logo');
-
-        if (pLogo) {
-            // Sécurisation HTML + gestion des retours à la ligne
-            pLogo.innerHTML = safeHtml(customText).replace(/\n/g, '<br>');
-        }
+        if (pLogo) pLogo.innerHTML = window.safeHtml(customText).replace(/\n/g, '<br>');
     }
 }
 
-// ==========================================
-// RENDU VISUEL (GRILLE)
-// ==========================================
-
-// Affiche la zone supérieure (DG, cabinet, etc.)
+/**
+ * RENDU VISUEL : Zone Supérieure
+ */
 function renderTopZone() {
+    const zones = {
+        'top-left': 'TOP_LEFT',
+        'top-center': 'TOP_CENTER',
+        'top-right': 'TOP_RIGHT'
+    };
 
-    // Zone gauche
-    const left = document.getElementById('top-left');
-    if (left) getStructuresByPos('TOP_LEFT')
-        .forEach(s => createDsfrTile(left, s));
-
-    // Zone centrale (chef)
-    const center = document.getElementById('top-center');
-    const centerStructs = getStructuresByPos('TOP_CENTER');
-
-    if (center && centerStructs.length > 0)
-        createDsfrTile(center, centerStructs[0], 'tile-chef');
-
-    // Zone droite
-    const right = document.getElementById('top-right');
-    if (right) getStructuresByPos('TOP_RIGHT')
-        .forEach(s => createDsfrTile(right, s));
+    Object.entries(zones).forEach(([id, pos]) => {
+        const container = document.getElementById(id);
+        if (!container) return;
+        
+        const structs = getStructuresByPos(pos);
+        structs.forEach(s => {
+            const extraClass = (id === 'top-center') ? 'tile-chef' : '';
+            createDsfrTile(container, s, extraClass);
+        });
+    });
 }
 
-// Affiche les colonnes principales (1 à 5)
+/**
+ * RENDU VISUEL : Colonnes 1 à 5
+ */
 function renderColumns() {
     for (let i = 1; i <= 5; i++) { 
         const container = document.getElementById(`col-${i}`);
         if (!container) continue;
 
-        // Tête de colonne
-        const heads = getStructuresByPos(`COL${i}_HEAD`);
-        if (heads.length > 0)
-            createDsfrTile(container, heads[0], 'tile-head');
-
-        // Sous-structures
-        const subs = getStructuresByPos(`COL${i}_SUB`);
-        subs.forEach(sub => createDsfrTile(container, sub));
+        // Têtes de colonnes
+        getStructuresByPos(`COL${i}_HEAD`).forEach(s => createDsfrTile(container, s, 'tile-head'));
+        // Sous-services
+        getStructuresByPos(`COL${i}_SUB`).forEach(s => createDsfrTile(container, s));
     }
 }
 
 /**
- * Création d'une tuile DSFR représentant une structure
+ * Génère une tuile DSFR pour une structure
  */
 function createDsfrTile(container, struct, extraClass = '') {
-
-    // Données sécurisées
     const codeBureau = window.safeHtml(struct[COL_STRUCT_CODE]).trim();
     const libelle = window.safeHtml(struct[COL_STRUCT_LIBELLE], "Sans nom");
     const resp = window.safeHtml(window.findResponsableName(struct, agentsHierarchyMap));
     const specialStyle = window.safeStr(struct[COL_STRUCT_STYLE]).toLowerCase();
 
-    // Style particulier (pointillé)
-    if (specialStyle.includes('pointill')) {
-        extraClass += ' tile-dashed';
-    }
+    if (specialStyle.includes('pointill')) extraClass += ' tile-dashed';
 
     const div = document.createElement('div');
-
-    // Classe DSFR + custom
     div.className = `fr-tile fr-enlarge-link fr-tile--no-icon ${extraClass}`;
 
-    // Header (code bureau)
-    const headerHtml = codeBureau
-        ? `<div class="tile-header">${codeBureau}</div>`
-        : '';
-
-    // Bloc responsable
-    let respHtml = '';
-    if (resp) {
-        respHtml = `
-        <div class="tile-resp-container">
-            <div class="tile-separator"></div>
-            <span class="tile-resp-name">${resp}</span>
-        </div>`;
-    }
-
-    // HTML final de la tuile
     div.innerHTML = `
-        ${headerHtml}
+        ${codeBureau ? `<div class="tile-header">${codeBureau}</div>` : ''}
         <div class="fr-tile__body">
             <div class="fr-tile__content">
                 <h3 class="fr-tile__title">
                     <a href="#">${libelle}</a>
                 </h3>
             </div>
-            ${respHtml}
+            ${resp ? `<div class="tile-resp-container">
+                        <div class="tile-separator"></div>
+                        <span class="tile-resp-name">${resp}</span>
+                      </div>` : ''}
         </div>
     `;
 
-    // Gestion du clic -> ouverture modale
     div.querySelector('a').addEventListener('click', (e) => {
         e.preventDefault();
         openModalForStructure(struct.id);
@@ -291,221 +161,121 @@ function createDsfrTile(container, struct, extraClass = '') {
     container.appendChild(div);
 }
 
-// ==========================================
-// MODALE DE DÉTAIL
-// ==========================================
-
 /**
- * Ouvre la modale pour une structure donnée
+ * MODALE : Détails de la structure et du responsable
  */
 window.openModalForStructure = function (structId) {
-    if (!structId) return;
     const struct = allStructures.find(s => s.id === structId);
     if (!struct) return;
 
-    const title = safeStr(struct[COL_STRUCT_LIBELLE]);
-    const respNameRaw = findResponsableName(struct, agentsHierarchyMap);
-    const respName = safeHtml(respNameRaw);
-
-    // Recherche des détails de l'agent responsable (via cache normalisé)
+    const respNameRaw = window.findResponsableName(struct, agentsHierarchyMap);
+    
+    // Recherche de l'agent responsable dans le cache pour les infos de contact
     let respAgent = null;
     if (respNameRaw) {
         const target = window.normalizeString(respNameRaw);
-        respAgent = allAgents.find(a =>
-            (a._fullname && a._fullname.includes(target)) ||
+        respAgent = allAgents.find(a => 
+            (a._fullname && a._fullname.includes(target)) || 
             (a._fullnameReverse && a._fullnameReverse.includes(target))
         );
     }
 
     let htmlContent = '';
-
-    // ==========================================
-    // 1. CARTE RESPONSABLE
-    // ==========================================
     if (respNameRaw) {
+        const fct = respAgent ? window.safeHtml(respAgent[COL_AGENT_FONCTION]) : "Responsable";
+        const email = respAgent ? window.safeHtml(respAgent[COL_AGENT_MAIL]) : "";
+        const tel = respAgent ? window.safeHtml(respAgent[COL_AGENT_TEL]) : "";
 
-        const fct = respAgent ? safeHtml(respAgent[COL_AGENT_FONCTION]) : "Responsable";
-        const emailAgent = respAgent ? safeHtml(respAgent[COL_AGENT_MAIL]) : "";
-        const emailGeneric = respAgent ? safeHtml(respAgent['Mail_generique']) : "";
-        const tel = respAgent ? safeHtml(respAgent[COL_AGENT_TEL]) : "";
-        const mobile = respAgent ? safeHtml(respAgent['Tel_PORT']) : "";
-
-        htmlContent += `
-        <div class="fr-card fr-card--no-border fr-mb-2w">
-            <div class="fr-card__body">
-                <div class="fr-card__content">
-                    <h3 class="fr-card__title">
-                        <span class="fr-icon-user-star-line fr-mr-1w"></span>
-                        ${respName}
-                    </h3>
-                    <p class="fr-card__desc text-bold">${fct}</p>
-                    <div class="fr-card__start">
-                        <ul class="fr-badges-group">
-
-                             ${emailAgent ? `<li><button onclick="copyToClipboard('${emailAgent.toLowerCase()}', this)" class="fr-badge fr-badge--info fr-badge--no-icon copy-btn">${emailAgent.toLowerCase()}</button></li>` : ''}
-
-                             ${emailGeneric ? `<li><button onclick="copyToClipboard('${emailGeneric.toLowerCase()}', this)" class="fr-badge fr-badge--purple-glycine fr-badge--no-icon copy-btn">Générique : ${emailGeneric.toLowerCase()}</button></li>` : ''}
-
-                             ${tel ? `<li><button onclick="copyToClipboard('${tel}', this)" class="fr-badge fr-badge--info fr-badge--no-icon copy-btn">Fixe : ${tel}</button></li>` : ''}
-
-                             ${mobile ? `<li><button onclick="copyToClipboard('${mobile}', this)" class="fr-badge fr-badge--info fr-badge--no-icon copy-btn">Mob. : ${mobile}</button></li>` : ''}
-
-                        </ul>
+        htmlContent = `
+            <div class="fr-card fr-card--no-border fr-mb-2w">
+                <div class="fr-card__body">
+                    <div class="fr-card__content">
+                        <h3 class="fr-card__title"><span class="fr-icon-user-star-line fr-mr-1w"></span>${window.safeHtml(respNameRaw)}</h3>
+                        <p class="fr-card__desc text-bold">${fct}</p>
+                        <div class="fr-card__start">
+                            <ul class="fr-badges-group">
+                                ${email ? `<li><button onclick="copyToClipboard('${email}', this)" class="fr-badge fr-badge--info">${email.toLowerCase()}</button></li>` : ''}
+                                ${tel ? `<li><span class="fr-badge fr-badge--success">📞 ${tel}</span></li>` : ''}
+                            </ul>
+                        </div>
                     </div>
                 </div>
-            </div>
-        </div>
-        `;
+            </div>`;
     } else {
-        htmlContent += `
-            <div class="fr-alert fr-alert--warning fr-mb-2w">
-                <p>Aucun responsable identifié pour ce service.</p>
-            </div>
-        `;
+        htmlContent = `<div class="fr-alert fr-alert--warning"><p>Aucun responsable listé.</p></div>`;
     }
 
-    // ==========================================
-    // 2. LIEN VERS PAGE DÉTAIL
-    // ==========================================
     htmlContent += `
         <div class="fr-grid-row fr-grid-row--center fr-mt-3w">
-            <a href="search.html?structure=${structId}" class="fr-btn fr-btn--secondary">
-                Voir toute l'équipe
-            </a>
-        </div>
-    `;
+            <a href="search.html?structure=${structId}" class="fr-btn fr-btn--secondary">Voir toute l'équipe</a>
+        </div>`;
 
-    // Injection dans la modale
-    document.getElementById('modal-title').innerText = title;
+    document.getElementById('modal-title').innerText = struct[COL_STRUCT_LIBELLE];
     document.getElementById('modal-body').innerHTML = htmlContent;
-
-    // Ouverture via DSFR
     document.getElementById('dsfr-hidden-modal-btn').click();
 };
 
-// ==========================================
-// UTILITAIRES
-// ==========================================
-
-// Filtrer les structures par position
+/**
+ * UTILITAIRES DE RECHERCHE & FILTRE
+ */
 function getStructuresByPos(code) {
-    return allStructures.filter(s =>
-        window.safeStr(s[COL_STRUCT_POSITION]).trim() === code
-    );
+    return allStructures.filter(s => window.safeStr(s[COL_STRUCT_POSITION]).trim() === code);
 }
 
-// ==========================================
-// RECHERCHE RAPIDE
-// ==========================================
 function initQuickSearch() {
-
     const select = document.getElementById('quick-select-structure');
     if (!select) return;
 
-    // Création des options du select
-    const options = allStructures.map(struct => {
+    // Population du select triée par libellé
+    allStructures
+        .map(s => ({ id: s.id, label: s[COL_STRUCT_LIBELLE] || s[COL_STRUCT_CODE] }))
+        .sort((a, b) => a.label.localeCompare(b.label))
+        .forEach(opt => {
+            const el = document.createElement('option');
+            el.value = opt.id;
+            el.textContent = opt.label;
+            select.appendChild(el);
+        });
 
-        const code = window.safeStr(struct['Structure']).trim();
-        const libelle = window.safeStr(struct[COL_STRUCT_LIBELLE]).trim();
-
-        let label = libelle;
-
-        if (code && code.toLowerCase() !== libelle.toLowerCase()) {
-            label = `${code} - ${libelle} `;
-        }
-
-        return { id: struct.id, label: label };
-    });
-
-    // Tri alphabétique
-    options.sort((a, b) =>
-        a.label.localeCompare(b.label, 'fr', { sensitivity: 'base' })
-    );
-
-    // Injection dans le select
-    options.forEach(opt => {
-        const option = document.createElement('option');
-        option.value = opt.id;
-        option.textContent = opt.label;
-        select.appendChild(option);
-    });
-
-    // Gestion des événements
     const btn = document.getElementById('quick-search-btn');
     const input = document.getElementById('quick-search-input');
 
-    if (btn) {
+    const doSearch = () => {
+        const params = new URLSearchParams();
+        if (select.value) params.set('structure', select.value);
+        if (input.value.trim()) params.set('q', input.value.trim());
+        window.location.href = `search.html?${params.toString()}`;
+    };
 
-        btn.addEventListener('click', triggerQuickSearch);
-
-        input.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') triggerQuickSearch();
-        });
-
-        function triggerQuickSearch() {
-
-            const structId = select.value;
-            const query = input.value.trim();
-
-            const params = new URLSearchParams();
-
-            if (structId) params.set('structure', structId);
-            if (query) params.set('q', query);
-
-            const queryString = params.toString();
-
-            // Redirection vers page de recherche
-            window.location.href = queryString
-                ? `search.html?${queryString}`
-                : 'search.html';
-        }
-    }
+    if (btn) btn.onclick = doSearch;
+    if (input) input.onkeypress = (e) => { if (e.key === 'Enter') doSearch(); };
 }
 
-
-
-// --- LOGIQUE ADMIN INDÉPENDANTE ---
-
-// Cette fonction va "brancher" les boutons une fois que la page est prête
-function setupAdminEvents() {
+/**
+ * ADMINISTRATION : Ajout rapide d'agent
+ */
+const adminInitInterval = setInterval(() => {
     const btnShow = document.getElementById('btn-show-form');
-    const btnCancel = document.getElementById('btn-cancel');
-    const btnSave = document.getElementById('btn-save');
-
-    if (btnShow) {
-        btnShow.onclick = () => {
-            console.log("Ouverture du formulaire...");
-            document.getElementById('form-creation-agent').style.display = 'block';
-        };
+    if (btnShow && allStructures.length > 0) {
+        setupAdminEvents();
+        populateAdminSelect();
+        clearInterval(adminInitInterval);
     }
+}, 500);
 
-    if (btnCancel) {
-        btnCancel.onclick = () => {
-            document.getElementById('form-creation-agent').style.display = 'none';
-        };
-    }
-
-    if (btnSave) {
-        btnSave.onclick = async () => {
-            await handleSaveAgent();
-        };
-    }
+function setupAdminEvents() {
+    document.getElementById('btn-show-form').onclick = () => document.getElementById('form-creation-agent').style.display = 'block';
+    document.getElementById('btn-cancel').onclick = () => document.getElementById('form-creation-agent').style.display = 'none';
+    document.getElementById('btn-save').onclick = handleSaveAgent;
 }
 
-// 2. Remplissage du menu des structures
-const populateAdminSelect = () => {
+function populateAdminSelect() {
     const select = document.getElementById('field-struct');
-    if (!select || !window.allStructures || allStructures.length === 0) return;
+    if (!select) return;
+    select.innerHTML = '<option value="" disabled selected>Choisir une structure...</option>' + 
+        allStructures.map(s => `<option value="${s.id}">${s[COL_STRUCT_LIBELLE] || s[COL_STRUCT_CODE]}</option>`).join('');
+}
 
-    let html = '<option value="" disabled selected>Choisir une structure...</option>';
-    allStructures.forEach(s => {
-        const label = s[COL_STRUCT_LIBELLE] || s[COL_STRUCT_CODE] || "Sans nom";
-        html += `<option value="${s.id}">${label}</option>`;
-    });
-    select.innerHTML = html;
-};
-
-// 3. La logique de sauvegarde isolée
 async function handleSaveAgent() {
     const data = {
         prenom: document.getElementById('field-prenom').value.trim(),
@@ -515,10 +285,7 @@ async function handleSaveAgent() {
         form: document.getElementById('field-formation').value.trim()
     };
 
-    if (!data.nom || isNaN(data.struct)) {
-        alert("⚠️ Le NOM et la STRUCTURE sont obligatoires.");
-        return;
-    }
+    if (!data.nom || isNaN(data.struct)) return alert("⚠️ Nom et Structure obligatoires.");
 
     try {
         await grist.docApi.applyUserActions([
@@ -530,25 +297,9 @@ async function handleSaveAgent() {
                 "Formations": data.form 
             }]
         ]);
-        alert("✅ Agent ajouté avec succès !");
-        location.reload(); 
+        alert("✅ Agent ajouté !");
+        location.reload();
     } catch (err) {
-        console.error("Erreur Grist:", err);
-        alert("❌ Erreur : Vérifiez vos droits et les noms de colonnes.");
+        alert("❌ Erreur : " + err.message);
     }
 }
-
-// --- LANCEMENT AUTOMATIQUE ---
-// On vérifie la présence des éléments toutes les 500ms jusqu'à ce qu'ils soient là
-const adminInitInterval = setInterval(() => {
-    if (document.getElementById('btn-show-form')) {
-        setupAdminEvents();
-        if (window.allStructures && window.allStructures.length > 0) {
-            populateAdminSelect();
-            clearInterval(adminInitInterval);
-            console.log("Admin Panel prêt !");
-        }
-    }
-}, 500);
-
-
