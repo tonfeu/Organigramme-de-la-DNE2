@@ -695,19 +695,35 @@ window.toggleAddForm = function() {
     const form = document.getElementById('add-agent-form');
     form.style.display = (form.style.display === 'none') ? 'block' : 'none';
 };
-
 // --- LOGIQUE ADMIN INDÉPENDANTE ---
 
-// 1. Gestion de l'affichage
-document.getElementById('btn-show-form')?.addEventListener('click', () => {
-    document.getElementById('form-creation-agent').style.display = 'block';
-});
+// Cette fonction va "brancher" les boutons une fois que la page est prête
+function setupAdminEvents() {
+    const btnShow = document.getElementById('btn-show-form');
+    const btnCancel = document.getElementById('btn-cancel');
+    const btnSave = document.getElementById('btn-save');
 
-document.getElementById('btn-cancel')?.addEventListener('click', () => {
-    document.getElementById('form-creation-agent').style.display = 'none';
-});
+    if (btnShow) {
+        btnShow.onclick = () => {
+            console.log("Ouverture du formulaire...");
+            document.getElementById('form-creation-agent').style.display = 'block';
+        };
+    }
 
-// 2. Remplissage du menu des structures (Boucle de sécurité)
+    if (btnCancel) {
+        btnCancel.onclick = () => {
+            document.getElementById('form-creation-agent').style.display = 'none';
+        };
+    }
+
+    if (btnSave) {
+        btnSave.onclick = async () => {
+            await handleSaveAgent();
+        };
+    }
+}
+
+// 2. Remplissage du menu des structures
 const populateAdminSelect = () => {
     const select = document.getElementById('field-struct');
     if (!select || !window.allStructures || allStructures.length === 0) return;
@@ -720,16 +736,8 @@ const populateAdminSelect = () => {
     select.innerHTML = html;
 };
 
-// On tente de remplir le select toutes les secondes tant qu'il est vide
-const selectInterval = setInterval(() => {
-    if (window.allStructures && window.allStructures.length > 0) {
-        populateAdminSelect();
-        clearInterval(selectInterval);
-    }
-}, 1000);
-
-// 3. Sauvegarde de l'agent et de ses formations
-document.getElementById('btn-save')?.addEventListener('click', async () => {
+// 3. La logique de sauvegarde isolée
+async function handleSaveAgent() {
     const data = {
         prenom: document.getElementById('field-prenom').value.trim(),
         nom: document.getElementById('field-nom').value.trim(),
@@ -738,7 +746,7 @@ document.getElementById('btn-save')?.addEventListener('click', async () => {
         form: document.getElementById('field-formation').value.trim()
     };
 
-    if (!data.nom || !data.struct) {
+    if (!data.nom || isNaN(data.struct)) {
         alert("⚠️ Le NOM et la STRUCTURE sont obligatoires.");
         return;
     }
@@ -750,14 +758,26 @@ document.getElementById('btn-save')?.addEventListener('click', async () => {
                 [COL_AGENT_NOM]: data.nom,
                 [COL_AGENT_FONCTION]: data.fct,
                 [COL_AGENT_STRUCT_REF]: data.struct,
-                "Formations": data.form // Assurez-vous que le nom de colonne 'Formations' existe dans Grist
+                "Formations": data.form 
             }]
         ]);
-
         alert("✅ Agent ajouté avec succès !");
         location.reload(); 
     } catch (err) {
         console.error("Erreur Grist:", err);
-        alert("❌ Erreur : Vérifiez que vous avez les droits 'Full Access' et que les noms de colonnes sont corrects.");
+        alert("❌ Erreur : Vérifiez vos droits et les noms de colonnes.");
     }
-});
+}
+
+// --- LANCEMENT AUTOMATIQUE ---
+// On vérifie la présence des éléments toutes les 500ms jusqu'à ce qu'ils soient là
+const adminInitInterval = setInterval(() => {
+    if (document.getElementById('btn-show-form')) {
+        setupAdminEvents();
+        if (window.allStructures && window.allStructures.length > 0) {
+            populateAdminSelect();
+            clearInterval(adminInitInterval);
+            console.log("Admin Panel prêt !");
+        }
+    }
+}, 500);
