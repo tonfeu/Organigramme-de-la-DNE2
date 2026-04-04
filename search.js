@@ -605,43 +605,32 @@ window.executeTransfer = async function(agentId, uniqueId, agentName) {
 // GESTION DE L'INTERFACE (UI) & ACTIONS
 // ==========================================
 
-/**
- * Affiche/Masque un élément (Menu de gestion ou formulaire)
- */
-window.toggleMgmt = function(id) {
-    const el = document.getElementById(id);
-    if (el) {
-        // Utilisation d'une ternaire pour basculer l'affichage
-        const isHidden = (el.style.display === 'none' || el.style.display === '');
-        el.style.display = isHidden ? 'flex' : 'none';
+// Affiche/Masque le formulaire d'ajout (utilisé par le bouton "Nouvel Agent")
+window.toggleForm = function() {
+    const form = document.getElementById('form-creation-agent');
+    if (form) {
+        const isHidden = (form.style.display === 'none' || form.style.display === '');
+        form.style.display = isHidden ? 'block' : 'none';
     }
 };
 
-/**
- * Gère l'ouverture des accordéons d'agents
- */
+// Gère l'ouverture des accordéons d'agents
 window.toggleAgent = function(id) {
     const el = document.getElementById(id);
-    if (el) {
-        el.classList.toggle('open');
-    }
+    if (el) el.classList.toggle('open');
 };
 
-/**
- * Transférer un agent vers une autre structure
- */
+// Action : Transférer un agent
 window.executeTransfer = async function(agentId, uniqueId, agentName) {
     const selectEl = document.getElementById(`select-transfer-${uniqueId}`);
-    if (!selectEl) return;
-
-    const newStructureId = parseInt(selectEl.value);
+    const newStructureId = selectEl ? parseInt(selectEl.value) : null;
 
     if (!newStructureId) {
-        alert("Veuillez sélectionner un bureau dans la liste avant de valider.");
+        alert("Veuillez sélectionner un bureau dans la liste.");
         return;
     }
 
-    if (!confirm(`Transférer ${agentName} vers cette structure ?`)) return;
+    if (!confirm(`Transférer ${agentName} ?`)) return;
 
     try {
         await grist.docApi.applyUserActions([
@@ -649,23 +638,11 @@ window.executeTransfer = async function(agentId, uniqueId, agentName) {
                 [COL_AGENT_STRUCT_REF]: newStructureId 
             }]
         ]);
-
         alert("Transfert réussi !");
-        
-        // Mise à jour locale pour éviter le rechargement complet si performSearch existe
-        if (window.allAgents) {
-            const agent = allAgents.find(a => a.id === agentId);
-            if (agent) agent[COL_AGENT_STRUCT_REF] = newStructureId;
-        }
-
-        if (typeof performSearch === "function") {
-            performSearch(); 
-        } else {
-            location.reload();
-        }
+        location.reload(); 
     } catch (error) {
         console.error("Erreur transfert:", error);
-        alert("Erreur : Vérifiez que vous avez les droits 'Full Access'.");
+        alert("Erreur : Vérifiez vos droits d'accès.");
     }
 };
 
@@ -673,70 +650,46 @@ window.executeTransfer = async function(agentId, uniqueId, agentName) {
 // LOGIQUE ADMINISTRATION (AJOUT AGENT)
 // ==========================================
 
-/**
- * Branche les événements du panneau d'administration
- */
+// Branchement des boutons du panneau d'admin
 function setupAdminEvents() {
     const btnShow = document.getElementById('btn-show-form');
     const btnCancel = document.getElementById('btn-cancel');
     const btnSave = document.getElementById('btn-save');
 
-    // On utilise addEventListener pour éviter d'écraser d'autres scripts
-    if (btnShow) {
-        btnShow.onclick = () => {
-            const form = document.getElementById('form-creation-agent');
-            if (form) form.style.display = 'block';
-        };
-    }
-
+    if (btnShow) btnShow.onclick = window.toggleForm;
+    
     if (btnCancel) {
         btnCancel.onclick = () => {
-            const form = document.getElementById('form-creation-agent');
-            if (form) form.style.display = 'none';
+            document.getElementById('form-creation-agent').style.display = 'none';
         };
     }
 
-    if (btnSave) {
-        btnSave.onclick = handleSaveAgent;
-    }
+    if (btnSave) btnSave.onclick = handleSaveAgent;
 }
 
-/**
- * Remplit le menu déroulant des structures dans le formulaire
- */
+// Remplit le menu déroulant des structures
 const populateAdminSelect = () => {
     const select = document.getElementById('field-struct');
     if (!select || !window.allStructures || allStructures.length === 0) return;
 
     let html = '<option value="" disabled selected>Choisir une structure...</option>';
     allStructures.forEach(s => {
-        // On utilise les constantes définies dans map.js
-        const label = s[COL_STRUCT_LIBELLE] || s[COL_STRUCT_CODE] || "Structure sans nom";
+        const label = s[COL_STRUCT_LIBELLE] || s[COL_STRUCT_CODE] || "Bureau";
         html += `<option value="${s.id}">${label}</option>`;
     });
     select.innerHTML = html;
 };
 
-/**
- * Action de sauvegarde d'un nouvel agent vers Grist
- */
+// Sauvegarde effective dans Grist
 async function handleSaveAgent() {
-    // Récupération des éléments
-    const elPrenom = document.getElementById('field-prenom');
-    const elNom = document.getElementById('field-nom');
-    const elFct = document.getElementById('field-fct');
-    const elStruct = document.getElementById('field-struct');
-    const elForm = document.getElementById('field-formation');
-
     const data = {
-        prenom: elPrenom.value.trim(),
-        nom: elNom.value.trim(),
-        fct: elFct.value.trim(),
-        struct: parseInt(elStruct.value),
-        form: elForm ? elForm.value.trim() : ""
+        prenom: document.getElementById('field-prenom').value.trim(),
+        nom: document.getElementById('field-nom').value.trim(),
+        fct: document.getElementById('field-fct').value.trim(),
+        struct: parseInt(document.getElementById('field-struct').value),
+        form: document.getElementById('field-formation').value.trim()
     };
 
-    // Validation
     if (!data.nom || isNaN(data.struct)) {
         alert("⚠️ Le NOM et la STRUCTURE sont obligatoires.");
         return;
@@ -749,37 +702,22 @@ async function handleSaveAgent() {
                 [COL_AGENT_NOM]: data.nom,
                 [COL_AGENT_FONCTION]: data.fct,
                 [COL_AGENT_STRUCT_REF]: data.struct,
-                "Formations": data.form  // Vérifiez que ce nom de colonne existe dans Grist
+                "Formations": data.form 
             }]
         ]);
-
         alert("✅ Agent ajouté avec succès !");
-        
-        // Nettoyage du formulaire
-        [elPrenom, elNom, elFct, elForm].forEach(el => { if(el) el.value = ''; });
-        document.getElementById('form-creation-agent').style.display = 'none';
-
-        // Rechargement pour mettre à jour l'organigramme
         location.reload(); 
     } catch (err) {
         console.error("Erreur Grist:", err);
-        alert("❌ Erreur : Vérifiez vos droits d'accès et les noms des colonnes dans Grist.");
+        alert("❌ Erreur : vérifiez les noms de colonnes Grist (ex: 'Formations').");
     }
 }
 
-// ==========================================
-// LANCEMENT AUTOMATIQUE
-// ==========================================
-
-// Surveillance de l'apparition des éléments du DOM et des données
+// Initialisation automatique
 const adminInitInterval = setInterval(() => {
-    const hasAdminPanel = document.getElementById('btn-show-form');
-    const hasData = window.allStructures && window.allStructures.length > 0;
-
-    if (hasAdminPanel && hasData) {
+    if (document.getElementById('btn-show-form') && window.allStructures) {
         setupAdminEvents();
         populateAdminSelect();
         clearInterval(adminInitInterval);
-        console.log("🚀 Système d'administration prêt.");
     }
 }, 500);
