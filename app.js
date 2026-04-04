@@ -17,44 +17,7 @@ grist.ready({
   }
 });
 
-// --- 1. FONCTIONS GLOBALES (En haut du fichier) ---
-window.toggleForm = function() {
-    const form = document.getElementById('form-creation-agent');
-    if (form) {
-        form.style.display = (form.style.display === 'none' || form.style.display === '') ? 'block' : 'none';
-    }
-};
 
-window.saveNewAgent = async function() {
-    const data = {
-        prenom: document.getElementById('field-prenom').value.trim(),
-        nom: document.getElementById('field-nom').value.trim(),
-        fct: document.getElementById('field-fct').value.trim(),
-        struct: parseInt(document.getElementById('field-struct').value),
-        form: document.getElementById('field-formation').value.trim()
-    };
-
-    if (!data.nom || isNaN(data.struct)) {
-        alert("⚠️ Le NOM et la STRUCTURE sont obligatoires.");
-        return;
-    }
-
-    try {
-        await grist.docApi.applyUserActions([
-            ["AddRecord", "Base_Agent", null, {
-                "Prenom": data.prenom,
-                "Nom": data.nom,
-                "Fonction": data.fct,
-                "Structure_de_l_agent": data.struct,
-                "Formations": data.form
-            }]
-        ]);
-        alert("✅ Agent ajouté !");
-        location.reload();
-    } catch (err) {
-        alert("❌ Erreur Grist : " + err.message);
-    }
-};
 
 // Lancement de la fonction principale après chargement du DOM
 document.addEventListener('DOMContentLoaded', init);
@@ -550,4 +513,3 @@ const adminInitInterval = setInterval(() => {
         }
     }
 }, 500);
-
