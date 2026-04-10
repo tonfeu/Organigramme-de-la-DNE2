@@ -427,11 +427,6 @@ function initQuickSearch() {
 
 
 
-/// ==========================================
-// LOGIQUE ADMINISTRATION (AJOUT AGENT)
-// ==========================================
-
-// 1. Branchement des boutons
 function setupAdminEvents() {
     const btnShow = document.getElementById('btn-show-form');
     const btnCancel = document.getElementById('btn-cancel');
@@ -439,7 +434,6 @@ function setupAdminEvents() {
 
     if (btnShow) {
         btnShow.onclick = () => {
-            console.log("Ouverture du formulaire...");
             document.getElementById('form-creation-agent').style.display = 'block';
         };
     }
@@ -457,14 +451,11 @@ function setupAdminEvents() {
     }
 }
 
-// 2. Remplissage du menu des structures (Synchronisé avec search.js)
 const populateAdminSelect = () => {
     const select = document.getElementById('field-struct');
     if (!select || !window.allStructures || allStructures.length === 0) return;
 
     let html = '<option value="" disabled selected>Choisir une structure...</option>';
-    
-    // On trie par nom pour que ce soit plus simple à trouver
     const sorted = [...window.allStructures].sort((a, b) => {
         const labelA = (a[COL_STRUCT_LIBELLE] || "").toString();
         const labelB = (b[COL_STRUCT_LIBELLE] || "").toString();
@@ -472,15 +463,12 @@ const populateAdminSelect = () => {
     });
 
     sorted.forEach(s => {
-        // On utilise la constante COL_STRUCT_LIBELLE définie dans map.js
         const label = s[COL_STRUCT_LIBELLE] || s[COL_STRUCT_CODE] || "Sans nom";
         html += `<option value="${s.id}">${label}</option>`;
     });
-    
     select.innerHTML = html;
 };
 
-// 3. Sauvegarde dans Grist
 async function handleSaveAgent() {
     const data = {
         prenom: document.getElementById('field-prenom').value.trim(),
@@ -509,15 +497,13 @@ async function handleSaveAgent() {
         location.reload(); 
     } catch (err) {
         console.error("Erreur Grist:", err);
-        alert("❌ Erreur : Vérifiez vos droits (Full Access) et les noms de colonnes.");
+        alert("❌ Erreur : Vérifiez vos droits et les noms de colonnes.");
     }
 }
 
-// --- LANCEMENT AUTOMATIQUE ---
 const adminInitInterval = setInterval(() => {
     if (document.getElementById('btn-show-form')) {
         setupAdminEvents();
-        // On attend que les structures soient chargées par Grist
         if (window.allStructures && window.allStructures.length > 0) {
             populateAdminSelect();
             clearInterval(adminInitInterval);
