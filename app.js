@@ -511,3 +511,32 @@ const adminInitInterval = setInterval(() => {
         }
     }
 }, 500);
+
+/**
+ * Remplit le menu déroulant du formulaire avec les bureaux réels
+ */
+function updateAdminStructureList() {
+    const structSelect = document.getElementById('field-struct');
+    if (!structSelect || !window.allStructures) return;
+
+    // On garde l'option par défaut
+    structSelect.innerHTML = '<option value="" disabled selected>Sélectionnez un bureau...</option>';
+
+    // On ajoute chaque bureau trié par nom
+    [...window.allStructures]
+        .sort((a, b) => a[COL_STRUCT_LIBELLE].localeCompare(b[COL_STRUCT_LIBELLE]))
+        .forEach(s => {
+            const opt = document.createElement('option');
+            opt.value = s.id;
+            opt.textContent = s[COL_STRUCT_LIBELLE];
+            structSelect.appendChild(opt);
+        });
+}
+
+// On modifie l'intervalle existant dans app.js pour appeler cette fonction
+const checkStructuresInterval = setInterval(() => {
+    if (window.allStructures && window.allStructures.length > 0) {
+        updateAdminStructureList();
+        clearInterval(checkStructuresInterval);
+    }
+}, 500);
