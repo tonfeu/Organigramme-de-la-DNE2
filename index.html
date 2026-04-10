@@ -79,45 +79,45 @@
             </div>
         </div>
     </header>
-
-      <section class="fr-container fr-my-4w" id="admin-panel" style="border: 2px solid #000091; padding: 1.5rem; background-color: #f5f5fe;">
+<section class="fr-container fr-my-4w" id="admin-panel" style="border: 2px solid #000091; padding: 1.5rem; background-color: #f5f5fe;">
     <div style="display: flex; justify-content: space-between; align-items: center;">
         <h2 class="fr-h4 fr-mb-0">Gestion du Personnel</h2>
-       <button class="fr-btn fr-icon-add-line fr-btn--icon-left" id="btn-show-form" onclick="window.toggleForm()">
-    Nouvel Agent
-       </button>
+        <button class="fr-btn fr-icon-add-line fr-btn--icon-left" id="btn-show-form">
+            Nouvel Agent
+        </button>
     </div>
 
-    <div id="form-creation-agent" style="display: none; margin-top: 2w; padding-top: 2w; border-top: 1px solid #ddd;">
+    <div id="form-creation-agent" style="display: none; margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid #ddd;">
         <div class="fr-grid-row fr-grid-row--gutters">
-            <div class="fr-col-12 fr-col-md-4">
+            <div class="fr-col-12 fr-col-md-6">
                 <label class="fr-label">Prénom</label>
-                <input class="fr-input" id="field-prenom" type="text">
+                <input class="fr-input" id="field-prenom" type="text" placeholder="Ex: Jean">
             </div>
-            <div class="fr-col-12 fr-col-md-4">
-                <label class="fr-label">Nom</label>
-                <input class="fr-input" id="field-nom" type="text">
+            <div class="fr-col-12 fr-col-md-6">
+                <label class="fr-label">Nom *</label>
+                <input class="fr-input" id="field-nom" type="text" placeholder="Ex: DUPONT">
             </div>
-            <div class="fr-col-12 fr-col-md-4">
+            <div class="fr-col-12 fr-col-md-6">
                 <label class="fr-label">Poste / Fonction</label>
-                <input class="fr-input" id="field-fct" type="text">
+                <input class="fr-input" id="field-fct" type="text" placeholder="Ex: Chef de bureau">
             </div>
             <div class="fr-col-12 fr-col-md-6">
-    <div class="fr-select-group">
-        <label class="fr-label" for="field-struct">Structure d'affectation</label>
-        <select class="fr-select" id="field-struct" name="field-struct">
-            <option value="" disabled selected>Sélectionnez un bureau...</option>
-            </select>
-    </div>
-</div>
-            <div class="fr-col-12 fr-col-md-6">
+                <label class="fr-label" for="field-struct">Structure d'affectation *</label>
+                <div style="display: flex; gap: 8px;">
+                    <select class="fr-select" id="field-struct">
+                        <option value="" disabled selected>Cliquer sur "Actualiser" --></option>
+                    </select>
+                    <button class="fr-btn fr-btn--tertiary fr-icon-refresh-line" id="btn-sync-struct" title="Charger les bureaux" type="button"></button>
+                </div>
+            </div>
+            <div class="fr-col-12">
                 <label class="fr-label">Formation Principale</label>
-                <input class="fr-input" id="field-formation" type="text" placeholder="Ex: SST, Électrique, etc.">
+                <input class="fr-input" id="field-formation" type="text" placeholder="Ex: SST, Habilitation électrique...">
             </div>
         </div>
         <div class="fr-mt-3w" style="text-align: right;">
             <button class="fr-btn fr-btn--secondary fr-mr-2w" id="btn-cancel">Annuler</button>
-            <button class="fr-btn" id="btn-save">Enregistrer dans la base</button>
+            <button class="fr-btn" id="btn-save">Enregistrer dans Grist</button>
         </div>
     </div>
 </section>

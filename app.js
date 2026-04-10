@@ -426,117 +426,95 @@ function initQuickSearch() {
 }
 
 
+// --- NOUVELLE STRATÉGIE D'ADMINISTRATION ---
 
-function setupAdminEvents() {
+function setupAdminSystem() {
     const btnShow = document.getElementById('btn-show-form');
     const btnCancel = document.getElementById('btn-cancel');
+    const btnSync = document.getElementById('btn-sync-struct');
     const btnSave = document.getElementById('btn-save');
-
-    if (btnShow) {
-        btnShow.onclick = () => {
-            document.getElementById('form-creation-agent').style.display = 'block';
-        };
-    }
-
-    if (btnCancel) {
-        btnCancel.onclick = () => {
-            document.getElementById('form-creation-agent').style.display = 'none';
-        };
-    }
-
-    if (btnSave) {
-        btnSave.onclick = async () => {
-            await handleSaveAgent();
-        };
-    }
-}
-
-const populateAdminSelect = () => {
-    const select = document.getElementById('field-struct');
-    if (!select || !window.allStructures || allStructures.length === 0) return;
-
-    let html = '<option value="" disabled selected>Choisir une structure...</option>';
-    const sorted = [...window.allStructures].sort((a, b) => {
-        const labelA = (a[COL_STRUCT_LIBELLE] || "").toString();
-        const labelB = (b[COL_STRUCT_LIBELLE] || "").toString();
-        return labelA.localeCompare(labelB);
-    });
-
-    sorted.forEach(s => {
-        const label = s[COL_STRUCT_LIBELLE] || s[COL_STRUCT_CODE] || "Sans nom";
-        html += `<option value="${s.id}">${label}</option>`;
-    });
-    select.innerHTML = html;
-};
-
-async function handleSaveAgent() {
-    const data = {
-        prenom: document.getElementById('field-prenom').value.trim(),
-        nom: document.getElementById('field-nom').value.trim(),
-        fct: document.getElementById('field-fct').value.trim(),
-        struct: parseInt(document.getElementById('field-struct').value),
-        form: document.getElementById('field-formation').value.trim()
-    };
-
-    if (!data.nom || isNaN(data.struct)) {
-        alert("⚠️ Le NOM et la STRUCTURE sont obligatoires.");
-        return;
-    }
-
-    try {
-        await grist.docApi.applyUserActions([
-            ["AddRecord", TABLE_AGENTS, null, {
-                [COL_AGENT_PRENOM]: data.prenom,
-                [COL_AGENT_NOM]: data.nom,
-                [COL_AGENT_FONCTION]: data.fct,
-                [COL_AGENT_STRUCT_REF]: data.struct,
-                "Formations": data.form 
-            }]
-        ]);
-        alert("✅ Agent ajouté avec succès !");
-        location.reload(); 
-    } catch (err) {
-        console.error("Erreur Grist:", err);
-        alert("❌ Erreur : Vérifiez vos droits et les noms de colonnes.");
-    }
-}
-
-const adminInitInterval = setInterval(() => {
-    if (document.getElementById('btn-show-form')) {
-        setupAdminEvents();
-        if (window.allStructures && window.allStructures.length > 0) {
-            populateAdminSelect();
-            clearInterval(adminInitInterval);
-            console.log("🚀 Admin Panel prêt !");
-        }
-    }
-}, 500);
-
-/**
- * Remplit le menu déroulant du formulaire avec les bureaux réels
- */
-function updateAdminStructureList() {
+    const formZone = document.getElementById('form-creation-agent');
     const structSelect = document.getElementById('field-struct');
-    if (!structSelect || !window.allStructures) return;
 
-    // On garde l'option par défaut
-    structSelect.innerHTML = '<option value="" disabled selected>Sélectionnez un bureau...</option>';
+    // 1. Afficher / Masquer le formulaire
+    btnShow.onclick = () => formZone.style.display = 'block';
+    btnCancel.onclick = () => formZone.style.display = 'none';
 
-    // On ajoute chaque bureau trié par nom
-    [...window.allStructures]
-        .sort((a, b) => a[COL_STRUCT_LIBELLE].localeCompare(b[COL_STRUCT_LIBELLE]))
-        .forEach(s => {
+    // 2. Fonction de remplissage de la liste (La Philosophie "On-Demand")
+    const fillStructures = () => {
+        // On récupère les structures depuis l'endroit où Grist les stocke (window.allStructures)
+        const data = window.allStructures || [];
+        
+        if (data.length === 0) {
+            alert("Les données ne sont pas encore prêtes. Réessayez dans 2 secondes.");
+            return;
+        }
+
+        structSelect.innerHTML = '<option value="" disabled selected>Choisir un bureau...</option>';
+        
+        // Tri alphabétique
+        const sorted = [...data].sort((a, b) => 
+            (a[COL_STRUCT_LIBELLE] || "").localeCompare(b[COL_STRUCT_LIBELLE] || "")
+        );
+
+        sorted.forEach(s => {
             const opt = document.createElement('option');
             opt.value = s.id;
             opt.textContent = s[COL_STRUCT_LIBELLE];
             structSelect.appendChild(opt);
         });
+        
+        btnSync.classList.remove('fr-icon-refresh-line');
+        btnSync.classList.add('fr-icon-check-line'); // Signale que c'est chargé
+    };
+
+    // Synchronisation manuelle au clic sur le bouton bleu
+    btnSync.onclick = fillStructures;
+
+    // 3. Sauvegarde
+    btnSave.onclick = async () => {
+        const payload = {
+            prenom: document.getElementById('field-prenom').value.trim(),
+            nom: document.getElementById('field-nom').value.trim(),
+            fct: document.getElementById('field-fct').value.trim(),
+            struct: parseInt(structSelect.value),
+            form: document.getElementById('field-formation').value.trim()
+        };
+
+        if (!payload.nom || isNaN(payload.struct)) {
+            alert("⚠️ Le NOM et la STRUCTURE sont obligatoires.");
+            return;
+        }
+
+        try {
+            btnSave.disabled = true;
+            btnSave.textContent = "Envoi...";
+            
+            await grist.docApi.applyUserActions([
+                ["AddRecord", TABLE_AGENTS, null, {
+                    [COL_AGENT_PRENOM]: payload.prenom,
+                    [COL_AGENT_NOM]: payload.nom,
+                    [COL_AGENT_FONCTION]: payload.fct,
+                    [COL_AGENT_STRUCT_REF]: payload.struct,
+                    "Formations": payload.form 
+                }]
+            ]);
+            
+            alert("✅ Succès !");
+            location.reload();
+        } catch (err) {
+            console.error(err);
+            alert("Erreur de droits ou de colonnes. Vérifiez Grist.");
+            btnSave.disabled = false;
+            btnSave.textContent = "Enregistrer dans Grist";
+        }
+    };
 }
 
-// On modifie l'intervalle existant dans app.js pour appeler cette fonction
-const checkStructuresInterval = setInterval(() => {
-    if (window.allStructures && window.allStructures.length > 0) {
-        updateAdminStructureList();
-        clearInterval(checkStructuresInterval);
+// Initialisation de la stratégie dès que le bouton "Nouvel Agent" existe
+const checkExist = setInterval(() => {
+    if (document.getElementById('btn-show-form')) {
+        setupAdminSystem();
+        clearInterval(checkExist);
     }
 }, 500);
