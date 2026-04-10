@@ -1,95 +1,312 @@
+
 <!DOCTYPE html>
+<!-- 
+    Document HTML principal de l'application Organigramme DNE
+    - Structure basée sur le DSFR (Design System de l'État Français)
+    - Permet l'affichage d’un organigramme dynamique + recherche + export PDF
+-->
 <html lang="fr" data-fr-scheme="system">
+
 <head>
+    <!-- Encodage des caractères -->
     <meta charset="UTF-8">
+
+    <!-- Responsive design (adaptation mobile/tablette) -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Organigramme De La DNE</title>
+
+    <!-- Titre de la page affiché dans l’onglet navigateur -->
+    <title>Organigramme  De La DNE</title>
+
+    <!-- ========================= -->
+    <!-- DSFR (Design System) CSS -->
+    <!-- ========================= -->
+    <!-- Styles principaux DSFR -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@gouvfr/dsfr@1.13.1/dist/dsfr/dsfr.min.css">
+    
+    <!-- Icônes DSFR -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@gouvfr/dsfr@1.13.1/dist/utility/icons/icons.min.css">
+
+    <!-- ========================= -->
+    <!-- Styles personnalisés -->
+    <!-- ========================= -->
     <link rel="stylesheet" href="./style.css">
 </head>
 
 <body>
+  
+
+    <!-- ========================= -->
+    <!-- EN-TÊTE (HEADER GLOBAL) -->
+    <!-- ========================= -->
     <header role="banner" class="fr-header">
         <div class="fr-header__body">
             <div class="fr-container">
                 <div class="fr-header__body-row">
-                    <div class="fr-header__brand">
+
+                    <!-- Bloc logo + identité -->
+                    <div class="fr-header__brand fr-enlarge-link">
                         <div class="fr-header__brand-top">
-                            <div class="fr-header__logo"><p class="fr-logo">République<br>Française</p></div>
+                            <div class="fr-header__logo">
+                                <!-- Logo République Française -->
+                                <p class="fr-logo">République<br>Française</p>
+                            </div>
                         </div>
+
+                        <!-- Nom du service -->
                         <div class="fr-header__service">
-                            <a href="index.html" title="Accueil">
-                                <p class="fr-header__service-title">Organigramme DNE</p>
+                            <a href="/" title="Retour à l'accueil">
+                                <p class="fr-header__service-title">Organigramme de la DNE</p>
                             </a>
                         </div>
                     </div>
+
+                    <!-- Outils (actions utilisateur) -->
                     <div class="fr-header__tools">
                         <div class="fr-header__tools-links">
                             <ul class="fr-btns-group">
-                                <li><button class="fr-btn fr-icon-add-line" id="btn-show-form">Ajouter un agent</button></li>
-                                <li><a class="fr-btn fr-icon-search-line" href="search.html">Annuaire</a></li>
-                                <li><button class="fr-btn fr-icon-file-pdf-line" id="btn-export-pdf">Export PDF</button></li>
+                                <li>
+                                    <!-- Bouton export PDF -->
+                                    <button class="fr-btn fr-btn--secondary fr-icon-download-line fr-btn--icon-left"
+                                        id="btn-export-pdf">
+                                        Télécharger PDF
+                                    </button>
+                                </li>
                             </ul>
                         </div>
                     </div>
+
                 </div>
             </div>
         </div>
     </header>
 
-    <main role="main">
-        <div class="fr-container fr-py-4w">
-            <section id="form-creation-agent" class="fr-card fr-p-4w fr-mb-4w" style="display: none; border: 1px solid var(--border-default-grey);">
-                <div class="fr-card__body">
-                    <h2 class="fr-h4">Nouvel Agent</h2>
-                    <div class="fr-grid-row fr-grid-row--gutters">
-                        <div class="fr-col-12 fr-col-md-6">
-                            <div class="fr-input-group">
-                                <label class="fr-label" for="field-prenom">Prénom</label>
-                                <input class="fr-input" type="text" id="field-prenom">
-                            </div>
-                            <div class="fr-input-group">
-                                <label class="fr-label" for="field-nom">Nom *</label>
-                                <input class="fr-input" type="text" id="field-nom" required>
-                            </div>
-                        </div>
-                        <div class="fr-col-12 fr-col-md-6">
-                            <div class="fr-input-group">
-                                <label class="fr-label" for="field-fct">Fonction</label>
-                                <input class="fr-input" type="text" id="field-fct">
-                            </div>
-                            <div class="fr-select-group">
-                                <label class="fr-label" for="field-struct">Structure *</label>
-                                <select class="fr-select" id="field-struct">
-                                    <option value="" disabled selected>Chargement...</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="fr-col-12">
-                            <div class="fr-input-group">
-                                <label class="fr-label" for="field-formation">Formation(s)</label>
-                                <textarea class="fr-input" id="field-formation" rows="2"></textarea>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="fr-mt-2w">
-                        <button class="fr-btn" id="btn-save">Enregistrer</button>
-                        <button class="fr-btn fr-btn--secondary" id="btn-cancel">Annuler</button>
-                    </div>
-                </div>
-            </section>
+      <section class="fr-container fr-my-4w" id="admin-panel" style="border: 2px solid #000091; padding: 1.5rem; background-color: #f5f5fe;">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h2 class="fr-h4 fr-mb-0">Gestion du Personnel</h2>
+       <button class="fr-btn fr-icon-add-line fr-btn--icon-left" id="btn-show-form" onclick="window.toggleForm()">
+    Nouvel Agent
+       </button>
+    </div>
 
-            <div id="organigramme-container">
-                <p id="loading-msg" style="text-align:center;">Chargement des données Grist...</p>
+    <div id="form-creation-agent" style="display: none; margin-top: 2w; padding-top: 2w; border-top: 1px solid #ddd;">
+        <div class="fr-grid-row fr-grid-row--gutters">
+            <div class="fr-col-12 fr-col-md-4">
+                <label class="fr-label">Prénom</label>
+                <input class="fr-input" id="field-prenom" type="text">
+            </div>
+            <div class="fr-col-12 fr-col-md-4">
+                <label class="fr-label">Nom</label>
+                <input class="fr-input" id="field-nom" type="text">
+            </div>
+            <div class="fr-col-12 fr-col-md-4">
+                <label class="fr-label">Poste / Fonction</label>
+                <input class="fr-input" id="field-fct" type="text">
+            </div>
+              <div class="fr-select-group">
+            <label class="fr-label" for="field-struct">Structure d'affectation</label>
+            <select class="fr-select" id="field-struct" name="field-struct">
+                <option value="" disabled selected>Chargement des bureaux...</option>
+            </select>
+        </div>
+            <div class="fr-col-12 fr-col-md-6">
+                <label class="fr-label">Formation Principale</label>
+                <input class="fr-input" id="field-formation" type="text" placeholder="Ex: SST, Électrique, etc.">
             </div>
         </div>
+        <div class="fr-mt-3w" style="text-align: right;">
+            <button class="fr-btn fr-btn--secondary fr-mr-2w" id="btn-cancel">Annuler</button>
+            <button class="fr-btn" id="btn-save">Enregistrer dans la base</button>
+        </div>
+    </div>
+</section>
+    <!-- ========================= -->
+    <!-- CONTENU PRINCIPAL -->
+    <!-- ========================= -->
+    <main class="fr-container fr-my-4w">
+
+        <!-- ========================================= -->
+        <!-- 1. BARRE DE RECHERCHE (MODE ACCORDÉON) -->
+        <!-- ========================================= -->
+        <section class="fr-accordion fr-mb-4w">
+
+            <!-- Titre de l’accordéon -->
+            <h3 class="fr-accordion__title">
+                <button class="fr-accordion__btn" aria-expanded="false" aria-controls="quick-search-area">
+                    Recherche rapide / Annuaire
+                </button>
+            </h3>
+
+            <!-- Contenu caché / affiché -->
+            <div class="fr-collapse" id="quick-search-area">
+
+                <!-- Texte explicatif -->
+                <p class="fr-text--sm fr-mb-1w">
+                    Utilisez ces filtres pour trouver un agent ou un service :
+                </p>
+
+                <!-- Grille de recherche -->
+                <div class="fr-grid-row fr-grid-row--gutters fr-pt-2w" style="align-items: flex-end;">
+
+                    <!-- FILTRE PAR STRUCTURE (SELECT) -->
+                    <div class="fr-col-12 fr-col-md-6">
+                        <div class="fr-select-group">
+                            <label class="fr-label" for="quick-select-structure">
+                                Filtrer par bureau
+                            </label>
+
+                            <!-- Liste remplie dynamiquement via JS -->
+                            <select class="fr-select" id="quick-select-structure">
+                                <option value="">Tous les bureaux</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- RECHERCHE TEXTE -->
+                    <div class="fr-col-12 fr-col-md-6">
+                        <div class="fr-search-bar" role="search">
+
+                            <label class="fr-label" for="quick-search-input">
+                                Rechercher
+                            </label>
+
+                            <!-- Champ de recherche -->
+                            <input class="fr-input"
+                                placeholder="Nom, Prénom, Fonction..."
+                                type="search"
+                                id="quick-search-input">
+
+                            <!-- Bouton lancer recherche --> 
+                            <button class="fr-btn" id="quick-search-btn">
+                                Rechercher
+                            </button>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </section>
+
+        <!-- ========================= -->
+        <!-- 2. ZONE SUPÉRIEURE -->
+        <!-- ========================= -->
+        <!-- Contient généralement les postes principaux -->
+        <div class="top-zone">
+            <div class="top-stack-left" id="top-left"></div>
+            <div class="top-center" id="top-center"></div>
+            <div class="top-stack-right" id="top-right"></div>
+        </div>
+
+        <!-- ========================= -->
+        <!-- 3. GRILLE PRINCIPALE -->
+        <!-- ========================= -->
+        <!-- Organisation en 4 colonnes -->
+        <div class="main-grid">
+    <div class="column-stack" id="col-1"></div>
+    <div class="column-stack" id="col-2"></div>
+    <div class="column-stack" id="col-3"></div>
+    <div class="column-stack" id="col-4"></div>
+    <div class="column-stack" id="col-5"></div> 
+         </div>
+        <!-- ========================= -->
+        <!-- MODALE (DÉTAIL D’UN BUREAU) -->
+        <!-- ========================= -->
+        <dialog id="info-modal"
+            class="fr-modal"
+            aria-labelledby="modal-title"
+            aria-modal="true">
+
+            <div class="fr-container fr-container--fluid fr-container-md">
+                <div class="fr-grid-row fr-grid-row--center">
+                    <div class="fr-col-12 fr-col-md-10 fr-col-lg-8">
+
+                        <div class="fr-modal__body">
+
+                            <!-- Header modale -->
+                            <div class="fr-modal__header">
+                                <button class="fr-btn--close fr-btn"
+                                    aria-controls="info-modal"
+                                    id="btn-close-modal">
+                                    Fermer
+                                </button>
+                            </div>
+
+                            <!-- Contenu dynamique -->
+                            <div class="fr-modal__content">
+                                <h1 id="modal-title" class="fr-modal__title">
+                                    Titre du bureau
+                                </h1>
+
+                                <!-- Injecté dynamiquement via JS -->
+                                <div id="modal-body"></div>
+                            </div>
+
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        </dialog>
+
+        <!-- Bouton caché pour déclencher la modale via DSFR -->
+        <button id="dsfr-hidden-modal-btn"
+            data-fr-opened="false"
+            aria-controls="info-modal"
+            style="display:none;"></button>
+
+    
+
+</div>
     </main>
 
-    <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+    <!-- ========================= -->
+    <!-- SCRIPTS JAVASCRIPT -->
+    <!-- ========================= -->
+
+    <!-- Export PDF -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-    
+
+    <!-- jsPDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+    <!-- Table PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+
+    <!-- API Grist (récupération données) -->
+    <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+
+    <!-- Modules DSFR -->
+    <script type="module"
+        src="https://cdn.jsdelivr.net/npm/@gouvfr/dsfr@1.13.1/dist/core/core.module.min.js"></script>
+
+    <script type="module"
+        src="https://cdn.jsdelivr.net/npm/@gouvfr/dsfr@1.13.1/dist/component/accordion/accordion.module.min.js"></script>
+
+    <script type="module"
+        src="https://cdn.jsdelivr.net/npm/@gouvfr/dsfr@1.13.1/dist/component/modal/modal.module.min.js"></script>
+
+    <script type="module"
+        src="https://cdn.jsdelivr.net/npm/@gouvfr/dsfr@1.13.1/dist/scheme/scheme.module.min.js"></script>
+
+    <!-- Scripts internes -->
     <script src="./map.js"></script>
     <script src="./app.js"></script>
+
+    <!-- Initialisation export PDF -->
+    <script type="module">
+        import { initPdfExport } from './pdf-export.js';
+
+        // Attendre que le DOM soit prêt
+        document.addEventListener("DOMContentLoaded", () => {
+
+            // Initialisation avec récupération des données dynamiques
+            initPdfExport(() =>
+                window.getOrganigrammeData
+                    ? window.getOrganigrammeData()
+                    : null
+            );
+        });
+    </script>
+
 </body>
 </html>
+
