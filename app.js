@@ -427,9 +427,11 @@ function initQuickSearch() {
 
 
 
-// --- LOGIQUE ADMIN INDÉPENDANTE ---
+/// ==========================================
+// LOGIQUE ADMINISTRATION (AJOUT AGENT)
+// ==========================================
 
-// Cette fonction va "brancher" les boutons une fois que la page est prête
+// 1. Branchement des boutons
 function setupAdminEvents() {
     const btnShow = document.getElementById('btn-show-form');
     const btnCancel = document.getElementById('btn-cancel');
@@ -455,20 +457,30 @@ function setupAdminEvents() {
     }
 }
 
-// 2. Remplissage du menu des structures
+// 2. Remplissage du menu des structures (Synchronisé avec search.js)
 const populateAdminSelect = () => {
     const select = document.getElementById('field-struct');
     if (!select || !window.allStructures || allStructures.length === 0) return;
 
     let html = '<option value="" disabled selected>Choisir une structure...</option>';
-    allStructures.forEach(s => {
+    
+    // On trie par nom pour que ce soit plus simple à trouver
+    const sorted = [...window.allStructures].sort((a, b) => {
+        const labelA = (a[COL_STRUCT_LIBELLE] || "").toString();
+        const labelB = (b[COL_STRUCT_LIBELLE] || "").toString();
+        return labelA.localeCompare(labelB);
+    });
+
+    sorted.forEach(s => {
+        // On utilise la constante COL_STRUCT_LIBELLE définie dans map.js
         const label = s[COL_STRUCT_LIBELLE] || s[COL_STRUCT_CODE] || "Sans nom";
         html += `<option value="${s.id}">${label}</option>`;
     });
+    
     select.innerHTML = html;
 };
 
-// 3. La logique de sauvegarde isolée
+// 3. Sauvegarde dans Grist
 async function handleSaveAgent() {
     const data = {
         prenom: document.getElementById('field-prenom').value.trim(),
@@ -497,19 +509,19 @@ async function handleSaveAgent() {
         location.reload(); 
     } catch (err) {
         console.error("Erreur Grist:", err);
-        alert("❌ Erreur : Vérifiez vos droits et les noms de colonnes.");
+        alert("❌ Erreur : Vérifiez vos droits (Full Access) et les noms de colonnes.");
     }
 }
 
 // --- LANCEMENT AUTOMATIQUE ---
-// On vérifie la présence des éléments toutes les 500ms jusqu'à ce qu'ils soient là
 const adminInitInterval = setInterval(() => {
     if (document.getElementById('btn-show-form')) {
         setupAdminEvents();
+        // On attend que les structures soient chargées par Grist
         if (window.allStructures && window.allStructures.length > 0) {
             populateAdminSelect();
             clearInterval(adminInitInterval);
-            console.log("Admin Panel prêt !");
+            console.log("🚀 Admin Panel prêt !");
         }
     }
 }, 500);
