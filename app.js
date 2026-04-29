@@ -17,8 +17,6 @@ grist.ready({
   }
 });
 
-
-
 // Lancement de la fonction principale après chargement du DOM
 document.addEventListener('DOMContentLoaded', init);
 
@@ -424,97 +422,3 @@ function initQuickSearch() {
         }
     }
 }
-
-
-// --- NOUVELLE STRATÉGIE D'ADMINISTRATION ---
-
-function setupAdminSystem() {
-    const btnShow = document.getElementById('btn-show-form');
-    const btnCancel = document.getElementById('btn-cancel');
-    const btnSync = document.getElementById('btn-sync-struct');
-    const btnSave = document.getElementById('btn-save');
-    const formZone = document.getElementById('form-creation-agent');
-    const structSelect = document.getElementById('field-struct');
-
-    // 1. Afficher / Masquer le formulaire
-    btnShow.onclick = () => formZone.style.display = 'block';
-    btnCancel.onclick = () => formZone.style.display = 'none';
-
-    // 2. Fonction de remplissage de la liste (La Philosophie "On-Demand")
-    const fillStructures = () => {
-        // On récupère les structures depuis l'endroit où Grist les stocke (window.allStructures)
-        const data = window.allStructures || [];
-        
-        if (data.length === 0) {
-            alert("Les données ne sont pas encore prêtes. Réessayez dans 2 secondes.");
-            return;
-        }
-
-        structSelect.innerHTML = '<option value="" disabled selected>Choisir un bureau...</option>';
-        
-        // Tri alphabétique
-        const sorted = [...data].sort((a, b) => 
-            (a[COL_STRUCT_LIBELLE] || "").localeCompare(b[COL_STRUCT_LIBELLE] || "")
-        );
-
-        sorted.forEach(s => {
-            const opt = document.createElement('option');
-            opt.value = s.id;
-            opt.textContent = s[COL_STRUCT_LIBELLE];
-            structSelect.appendChild(opt);
-        });
-        
-        btnSync.classList.remove('fr-icon-refresh-line');
-        btnSync.classList.add('fr-icon-check-line'); // Signale que c'est chargé
-    };
-
-    // Synchronisation manuelle au clic sur le bouton bleu
-    btnSync.onclick = fillStructures;
-
-    // 3. Sauvegarde
-    btnSave.onclick = async () => {
-        const payload = {
-            prenom: document.getElementById('field-prenom').value.trim(),
-            nom: document.getElementById('field-nom').value.trim(),
-            fct: document.getElementById('field-fct').value.trim(),
-            struct: parseInt(structSelect.value),
-            form: document.getElementById('field-formation').value.trim()
-        };
-
-        if (!payload.nom || isNaN(payload.struct)) {
-            alert("⚠️ Le NOM et la STRUCTURE sont obligatoires.");
-            return;
-        }
-
-        try {
-            btnSave.disabled = true;
-            btnSave.textContent = "Envoi...";
-            
-            await grist.docApi.applyUserActions([
-                ["AddRecord", TABLE_AGENTS, null, {
-                    [COL_AGENT_PRENOM]: payload.prenom,
-                    [COL_AGENT_NOM]: payload.nom,
-                    [COL_AGENT_FONCTION]: payload.fct,
-                    [COL_AGENT_STRUCT_REF]: payload.struct,
-                    "Formations": payload.form 
-                }]
-            ]);
-            
-            alert("✅ Succès !");
-            location.reload();
-        } catch (err) {
-            console.error(err);
-            alert("Erreur de droits ou de colonnes. Vérifiez Grist.");
-            btnSave.disabled = false;
-            btnSave.textContent = "Enregistrer dans Grist";
-        }
-    };
-}
-
-// Initialisation de la stratégie dès que le bouton "Nouvel Agent" existe
-const checkExist = setInterval(() => {
-    if (document.getElementById('btn-show-form')) {
-        setupAdminSystem();
-        clearInterval(checkExist);
-    }
-}, 500);

@@ -1,7 +1,7 @@
 // ==========================================
 // PARAMÈTRES
 // ==========================================
-// Note: La configuration experte Grist (Noms des colonnes) a été centralisée dans "map.js"
+// Note: La configuration experte Grist (Noms des colonnes) a été centralisée dans "utils.js"
 
 // Récupération des paramètres URL (Filtre structure ou recherche texte)
 const urlParams = new URLSearchParams(window.location.search);
@@ -154,7 +154,7 @@ function performSearch() {
     const textQuery = document.getElementById('searchInput').value.trim().toLowerCase();
     const select = document.getElementById('select-structure');
     const structIdVal = select ? select.value : null;
-    const structId = structIdVal ? parseInt(structIdVal, 10) : null;Z
+    const structId = structIdVal ? parseInt(structIdVal, 10) : null;
 
     // Si aucun critère, on nettoie l'affichage et l'URL
     if (!textQuery && !structId) {
@@ -605,32 +605,33 @@ window.executeTransfer = async function(agentId, uniqueId, agentName) {
 // GESTION DE L'INTERFACE (UI) & ACTIONS
 // ==========================================
 
-// Affiche/Masque le formulaire d'ajout (utilisé par le bouton "Nouvel Agent")
-window.toggleForm = function() {
-    const form = document.getElementById('form-creation-agent');
-    if (form) {
-        const isHidden = (form.style.display === 'none' || form.style.display === '');
-        form.style.display = isHidden ? 'block' : 'none';
+// Affiche/Masque le bandeau gris d'administration
+window.toggleMgmt = function(id) {
+    const el = document.getElementById(id);
+    if (el) {
+        el.style.display = (el.style.display === 'none' || el.style.display === '') ? 'flex' : 'none';
     }
 };
 
-// Gère l'ouverture des accordéons d'agents
+// Gère l'ouverture de l'accordéon
 window.toggleAgent = function(id) {
     const el = document.getElementById(id);
-    if (el) el.classList.toggle('open');
+    if (el) {
+        el.classList.toggle('open');
+    }
 };
 
-// Action : Transférer un agent
+// LA NOUVELLE FONCTION (Remplace celle avec le prompt)
 window.executeTransfer = async function(agentId, uniqueId, agentName) {
     const selectEl = document.getElementById(`select-transfer-${uniqueId}`);
-    const newStructureId = selectEl ? parseInt(selectEl.value) : null;
+    const newStructureId = parseInt(selectEl.value);
 
     if (!newStructureId) {
-        alert("Veuillez sélectionner un bureau dans la liste.");
+        alert("Veuillez sélectionner un bureau dans la liste avant de valider.");
         return;
     }
 
-    if (!confirm(`Transférer ${agentName} ?`)) return;
+    if (!confirm(`Transférer ${agentName} vers cette structure ?`)) return;
 
     try {
         await grist.docApi.applyUserActions([
@@ -638,86 +639,59 @@ window.executeTransfer = async function(agentId, uniqueId, agentName) {
                 [COL_AGENT_STRUCT_REF]: newStructureId 
             }]
         ]);
+
         alert("Transfert réussi !");
-        location.reload(); 
+        
+        // Mise à jour locale pour éviter le rechargement
+        const agent = allAgents.find(a => a.id === agentId);
+        if (agent) agent[COL_AGENT_STRUCT_REF] = newStructureId;
+        
+        performSearch(); 
     } catch (error) {
         console.error("Erreur transfert:", error);
-        alert("Erreur : Vérifiez vos droits d'accès.");
+        alert("Erreur : Vérifiez que vous êtes bien en accès 'Full'.");
     }
 };
+window.submitNewAgent = async function() {
+    // 1. Récupération des valeurs
+    const prenom = document.getElementById('new-agent-prenom').value.trim();
+    const nom = document.getElementById('new-agent-nom').value.trim();
+    const fct = document.getElementById('new-agent-fct').value.trim();
+    const structId = parseInt(document.getElementById('new-agent-struct').value);
 
-// ==========================================
-// LOGIQUE ADMINISTRATION (AJOUT AGENT)
-// ==========================================
-
-// Branchement des boutons du panneau d'admin
-function setupAdminEvents() {
-    const btnShow = document.getElementById('btn-show-form');
-    const btnCancel = document.getElementById('btn-cancel');
-    const btnSave = document.getElementById('btn-save');
-
-    if (btnShow) btnShow.onclick = window.toggleForm;
-    
-    if (btnCancel) {
-        btnCancel.onclick = () => {
-            document.getElementById('form-creation-agent').style.display = 'none';
-        };
-    }
-
-    if (btnSave) btnSave.onclick = handleSaveAgent;
-}
-
-// Remplit le menu déroulant des structures
-const populateAdminSelect = () => {
-    const select = document.getElementById('field-struct');
-    if (!select || !window.allStructures || allStructures.length === 0) return;
-
-    let html = '<option value="" disabled selected>Choisir une structure...</option>';
-    allStructures.forEach(s => {
-        const label = s[COL_STRUCT_LIBELLE] || s[COL_STRUCT_CODE] || "Bureau";
-        html += `<option value="${s.id}">${label}</option>`;
-    });
-    select.innerHTML = html;
-};
-
-// Sauvegarde effective dans Grist
-async function handleSaveAgent() {
-    const data = {
-        prenom: document.getElementById('field-prenom').value.trim(),
-        nom: document.getElementById('field-nom').value.trim(),
-        fct: document.getElementById('field-fct').value.trim(),
-        struct: parseInt(document.getElementById('field-struct').value),
-        form: document.getElementById('field-formation').value.trim()
-    };
-
-    if (!data.nom || isNaN(data.struct)) {
-        alert("⚠️ Le NOM et la STRUCTURE sont obligatoires.");
+    // 2. Validation minimale
+    if (!nom || !structId) {
+        alert("Le nom et la structure sont obligatoires.");
         return;
     }
 
     try {
+        // 3. Envoi à Grist via AddRecord
         await grist.docApi.applyUserActions([
             ["AddRecord", TABLE_AGENTS, null, {
-                [COL_AGENT_PRENOM]: data.prenom,
-                [COL_AGENT_NOM]: data.nom,
-                [COL_AGENT_FONCTION]: data.fct,
-                [COL_AGENT_STRUCT_REF]: data.struct,
-                "Formations": data.form 
+                [COL_AGENT_PRENOM]: prenom,
+                [COL_AGENT_NOM]: nom,
+                [COL_AGENT_FONCTION]: fct,
+                [COL_AGENT_STRUCT_REF]: structId
             }]
         ]);
-        alert("✅ Agent ajouté avec succès !");
-        location.reload(); 
-    } catch (err) {
-        console.error("Erreur Grist:", err);
-        alert("❌ Erreur : vérifiez les noms de colonnes Grist (ex: 'Formations').");
-    }
-}
 
-// Initialisation automatique
-const adminInitInterval = setInterval(() => {
-    if (document.getElementById('btn-show-form') && window.allStructures) {
-        setupAdminEvents();
-        populateAdminSelect();
-        clearInterval(adminInitInterval);
+        alert("Agent ajouté avec succès !");
+        
+        // 4. Nettoyage et rafraîchissement
+        document.querySelectorAll('#add-agent-form input').forEach(i => i.value = '');
+        window.toggleAddForm();
+        
+        // Optionnel : Recharger les données pour voir le nouvel agent
+        location.reload(); 
+
+    } catch (error) {
+        console.error("Erreur ajout agent:", error);
+        alert("Impossible d'ajouter l'agent. Vérifiez vos droits.");
     }
-}, 500);
+};
+
+window.toggleAddForm = function() {
+    const form = document.getElementById('add-agent-form');
+    form.style.display = (form.style.display === 'none') ? 'block' : 'none';
+};
