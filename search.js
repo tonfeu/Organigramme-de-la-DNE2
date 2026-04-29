@@ -1,304 +1,723 @@
-/**
- * ==========================================
- * ÉTAT GLOBAL & PARAMÈTRES
- * ==========================================
- */
-// Note : Les constantes TABLE_... et COL_... doivent être définies dans "map.js"
+// ==========================================
+// PARAMÈTRES
+// ==========================================
+// Note: La configuration experte Grist (Noms des colonnes) a été centralisée dans "map.js"
+
+// Récupération des paramètres URL (Filtre structure ou recherche texte)
 const urlParams = new URLSearchParams(window.location.search);
+const structFilterId = urlParams.get('structure'); // ID numérique de la structure
+const textFilterQuery = urlParams.get('q'); // Requête texte libre
 
-let state = {
-    allAgents: [],
-    allStructures: [],
-    structureMap: new Map(),
-    agentsHierarchyMap: new Map(),
-    filters: {
-        structureId: urlParams.get('structure') ? parseInt(urlParams.get('structure'), 10) : null,
-        textQuery: urlParams.get('q') || ''
-    }
-};
+// Données globales
+let allAgents = [];
+let allStructures = [];
+let structureMap = new Map(); // pour les perfs de recherche
+let agentsHierarchyMap = new Map(); //  pour la hiéarchie
 
-/**
- * ==========================================
- * INITIALISATION
- * ==========================================
- */
-grist.ready({ requiredAccess: 'full' });
-
-document.addEventListener('DOMContentLoaded', async () => {
-    await init();
-    setupEventListeners();
-    setupAdminEvents();
+// ==========================================
+// INITIALISATION
+// ==========================================
+grist.ready({ 
+  requiredAccess: 'full',
+  onRecords: function(records) {
+    // Cette fonction optionnelle peut aider à stabiliser la connexion
+  }
 });
+document.addEventListener('DOMContentLoaded', init);
 
 async function init() {
-    const loading = document.getElementById('loadingMessage');
     try {
-        if (loading) loading.style.display = 'block';
+        console.log("Initialisation page recherche (Interne Grist)...");
+        document.getElementById('loadingMessage').style.display = 'block';
 
-        // 1. Récupération des données
+        // 2. Récupération directe via Grist Plugin API
         const tables = [TABLE_AGENTS, TABLE_STRUCTURES];
         const data = {};
 
         await Promise.all(tables.map(async (name) => {
             const result = await grist.docApi.fetchTable(name);
-            data[name] = window.transformColsToRows ? window.transformColsToRows(result) : result;
+            data[name] = window.transformColsToRows(result);
         }));
 
-        // 2. Traitement & Maps de performance
-        state.allAgents = window.enrichAgentsData ? window.enrichAgentsData(data[TABLE_AGENTS]) : data[TABLE_AGENTS];
-        state.allStructures = data[TABLE_STRUCTURES];
-        state.structureMap = window.createStructureMap ? window.createStructureMap(state.allStructures) : new Map(state.allStructures.map(s => [s.id, s]));
-        state.agentsHierarchyMap = window.createAgentsHierarchyMap ? window.createAgentsHierarchyMap(state.allAgents) : new Map();
+        allAgents = window.enrichAgentsData(data[TABLE_AGENTS]); // Noms pré-calculés
+        agentsHierarchyMap = window.createAgentsHierarchyMap(allAgents);
+        allStructures = data[TABLE_STRUCTURES];
+        structureMap = window.createStructureMap(allStructures);
 
-        // 3. Remplissage UI
-        populateSelects();
-        syncFiltersWithUI();
+        console.log(`Données chargées : ${allAgents.length} agents, ${allStructures.length} structures.`);
 
-        // 4. Lancement recherche initiale
-        performSearch();
+        // 3. Configuration de l'interface
+        setupUI();
+        populateStructureSelect();
 
-        if (loading) loading.style.display = 'none';
+        // 4. Application des filtres initiaux (si présents dans l'URL)
+        if (structFilterId) {
+            const select = document.getElementById('select-structure');
+            if (select) select.value = structFilterId;
+        }
+
+        if (textFilterQuery) {
+            document.getElementById('searchInput').value = textFilterQuery;
+        }
+
+        // Lancement de la recherche si un filtre est actif
+        if (structFilterId || textFilterQuery) {
+            performSearch();
+        } else {
+            // Affichage initial vide (ou message d'accueil)
+            document.getElementById('loadingMessage').style.display = 'none';
+        }
+
     } catch (e) {
-        console.error("ERREUR INIT :", e);
-        const area = document.getElementById('resultArea');
-        if (area) area.innerHTML = `<div class="fr-alert fr-alert--error">${e.message}</div>`;
+        console.error("ERREUR :", e);
+        document.getElementById('resultArea').innerHTML = `<div class="fr-alert fr-alert--error">${e.message}</div>`;
+    }
+
+    function prepareAddForm() {
+    const select = document.getElementById('new-agent-struct');
+    if (!select) return;
+    
+    // On réutilise allStructures pour remplir le select du formulaire
+    select.innerHTML = '<option value="" disabled selected>Choisir une structure...</option>' + 
+        allStructures.map(s => `<option value="${s.id}">${safeStr(s[COL_STRUCT_LIBELLE])}</option>`).join('');
+
+    // Si on est admin, on affiche le bouton "Ajouter"
+    if (grist.getAccessLevel() === 'full') {
+        document.getElementById('admin-add-section').style.display = 'block';
     }
 }
+}
 
-/**
- * ==========================================
- * MOTEUR DE RECHERCHE & TRI
- * ==========================================
- */
-function performSearch() {
-    const textQuery = document.getElementById('searchInput')?.value.trim().toLowerCase() || "";
-    const structId = parseInt(document.getElementById('select-structure')?.value) || null;
+// ==========================================
+// LOGIQUE UI (Evénements)
+// ==========================================
 
-    state.filters = { structureId: structId, textQuery };
-    updateURL();
+// Bascule l'ouverture/fermeture des détails d'un agent
+window.toggleAgent = function (id) {
+    const el = document.getElementById(id);
+    if (el) el.classList.toggle('open');
+};
 
-    // Filtrage
-    const results = state.allAgents.filter(a => {
-        const matchStruct = !structId || a[COL_AGENT_STRUCT_REF] === structId;
-        if (!matchStruct) return false;
-        if (!textQuery) return true;
+function setupUI() {
+    // Bouton de recherche manuel
+    document.getElementById('searchBtn').addEventListener('click', performSearch);
 
-        const s = state.structureMap.get(a[COL_AGENT_STRUCT_REF]);
-        const searchFields = [
-            a[COL_AGENT_NOM], a[COL_AGENT_PRENOM], a[COL_AGENT_FONCTION],
-            a['Missions_du_poste'], a['Nom_du_projet'],
-            s ? s[COL_STRUCT_LIBELLE] : '', s ? s[COL_STRUCT_CODE] : ''
-        ].map(v => safeStr(v).toLowerCase());
+    // Recherche en direct pendant la frappe (Debouncée pour éviter les lags)
+    const debouncedSearch = window.debounce(performSearch, 300);
+    document.getElementById('searchInput').addEventListener('input', debouncedSearch);
 
-        return searchFields.some(f => f.includes(textQuery));
+    // Changement dans le select (lance la recherche directement)
+    const select = document.getElementById('select-structure');
+    if (select) {
+        select.addEventListener('change', performSearch);
+    }
+
+    // Masquage de l'ancienne bannière de filtre (obsolète)
+    const filterBanner = document.getElementById('filter-banner');
+    if (filterBanner) filterBanner.style.display = 'none';
+}
+
+// Remplit le menu déroulant des structures
+function populateStructureSelect() {
+    const select = document.getElementById('select-structure');
+    if (!select) return;
+
+    // Création des options : "Code - Libellé" si le code existe, sinon juste "Libellé"
+    const options = allStructures.map(struct => {
+        const code = safeStr(struct['Structure']).trim();
+        const libelle = safeStr(struct['Libelle']).trim();
+        let label = libelle;
+
+        // Evite la répétition si Code == Libellé (ex: "SAAM" - "SAAM")
+        if (code && code.toLowerCase() !== libelle.toLowerCase()) {
+            label = `${code} - ${libelle}`;
+        }
+        return { id: struct.id, label: label };
     });
 
-    // Détermination du chef de structure (pour le tri)
-    let chefName = "";
-    if (structId) {
-        const s = state.structureMap.get(structId);
-        chefName = s && window.findResponsableName ? safeStr(window.findResponsableName(s, state.agentsHierarchyMap)).toLowerCase() : "";
-    }
+    // Tri alphabétique sur le label affiché
+    options.sort((a, b) => a.label.localeCompare(b.label, 'fr', { sensitivity: 'base' }));
 
-    renderDispatcher(results, chefName);
+    options.forEach(opt => {
+        const option = document.createElement('option');
+        option.value = opt.id;
+        option.textContent = opt.label;
+        select.appendChild(option);
+    });
 }
 
-function renderDispatcher(results, chefName) {
-    const container = document.getElementById('resultArea');
-    if (!container) return;
+// ==========================================
+// MOTEUR DE RECHERCHE
+// ==========================================
 
-    if (results.length === 0) {
-        container.innerHTML = `<div class="fr-alert fr-alert--warning"><p>Aucun agent trouvé.</p></div>`;
+function performSearch() {
+    const textQuery = document.getElementById('searchInput').value.trim().toLowerCase();
+    const select = document.getElementById('select-structure');
+    const structIdVal = select ? select.value : null;
+    const structId = structIdVal ? parseInt(structIdVal, 10) : null;Z
+
+    // Si aucun critère, on nettoie l'affichage et l'URL
+    if (!textQuery && !structId) {
+        document.getElementById('resultArea').innerHTML = '';
+        document.getElementById('page-title').innerText = 'Moteur de recherche';
+
+        const qs = new URLSearchParams(window.location.search);
+        qs.delete('structure');
+        qs.delete('q');
+        const queryString = qs.toString();
+        const newUrl = queryString ? `?${queryString}` : window.location.pathname;
+        window.history.replaceState({}, '', newUrl);
         return;
     }
 
-    // Cas 1 : Vue par Structure (Regroupement par Pôle)
-    if (state.filters.structureId && !state.filters.textQuery) {
+    document.getElementById('loadingMessage').style.display = 'block';
+
+    // Mise à jour de l'URL sans rechargement
+    const qs = new URLSearchParams(window.location.search);
+    if (structId) qs.set('structure', structId);
+    else qs.delete('structure');
+
+    if (textQuery) qs.set('q', textQuery);
+    else qs.delete('q');
+
+    const queryString = qs.toString();
+    const newUrl = queryString ? `?${queryString}` : window.location.pathname;
+    window.history.replaceState({}, '', newUrl);
+
+    // FILTRAGE DES AGENTS
+    const results = allAgents.filter(a => {
+        // 1. Filtre par Structure (si sélectionné)
+        if (structId !== null && a['Structure_de_l_agent'] !== structId) {
+            return false;
+        }
+
+        // 2. Filtre par Texte (si saisi)
+        // Recherche sur Nom, Prénom et Fonction
+        if (textQuery) {
+            const nom = safeStr(a['Nom_d_usage_de_l_agent']).toLowerCase();
+            const prenom = safeStr(a['Prenom']).toLowerCase();
+            const fct = safeStr(a['Fonction_de_l_agent']).toLowerCase();
+            const missions = safeStr(a['Missions_du_poste'] || a['missions_du_poste']).toLowerCase();
+            const projet = safeStr(a['nom_du_projet'] || a['Nom_du_projet']).toLowerCase();
+
+            // Recherche aussi sur le libellé et code de la structure via la Map O(1)
+            let structLibelle = '';
+            let structCode = '';
+            const sId = a['Structure_de_l_agent'];
+            if (sId) {
+                const s = structureMap.get(sId);
+                if (s) {
+                    structLibelle = safeStr(s['Libelle']).toLowerCase();
+                    structCode = safeStr(s['Structure']).toLowerCase();
+                }
+            }
+
+            return nom.includes(textQuery) ||
+                prenom.includes(textQuery) ||
+                fct.includes(textQuery) ||
+                missions.includes(textQuery) ||
+                projet.includes(textQuery) ||
+                structLibelle.includes(textQuery) ||
+                structCode.includes(textQuery);
+        }
+
+        return true;
+    });
+
+    // Construction du titre de la page (Feedback utilisateur)
+    let title = `${results.length} résultat(s)`;
+    let description = 'Recherchez un agent ou un bureau.';
+
+    if (structId) {
+        const s = allStructures.find(st => st.id === structId);
+        if (s) {
+            const code = safeStr(s['Structure']).trim();
+            const libelle = safeStr(s['Libelle']).trim();
+            let label = (code && code.toLowerCase() !== libelle.toLowerCase()) ? `${code} - ${libelle}` : libelle;
+            title = `Structure : ${label}`;
+
+            // Récupération de la description de la structure
+            const descStruct = safeHtml(s['Description_Structure'] || s['description_structure']);
+            if (descStruct) {
+                description = descStruct;
+            }
+
+            if (textQuery) title += ` (recherche "${textQuery}")`;
+        }
+    } else if (textQuery) {
+        title += ` pour "${textQuery}"`;
+    }
+
+    // ==========================================
+    // TRI DES RÉSULTATS (Hiérarchique + Pôle)
+    // ==========================================
+
+    // Fonction utilitaire pour normaliser
+    const norm = str => safeStr(str).toLowerCase().trim();
+
+    // Récupération du nom du chef de la structure filtrée (si filtre actif)
+    let chefNameNormalized = "";
+    if (structId) {
+        const s = structureMap.get(structId); // Optim O(1)
+        if (s) {
+            const chefName = window.findResponsableName(s, agentsHierarchyMap);
+            if (chefName) chefNameNormalized = norm(chefName);
+        }
+    }
+
+    // CAS SPÉCIAL : Affichage par Structure (sans recherche texte) -> REGROUPEMENT PAR PÔLE
+    if (structId && !textQuery) {
+        // 1. Regroupement
         const groups = {};
         results.forEach(a => {
-            const pole = safeStr(a['Pole_ou_section_'] || a['pole_ou_section_']).trim() || "Direction / Transverse";
+            const pole = safeStr(a['Pole_ou_section_'] || a['pole_ou_section_']).trim();
             if (!groups[pole]) groups[pole] = [];
             groups[pole].push(a);
         });
 
-        const sortedGroups = Object.keys(groups).sort().map(key => ({
-            name: key === "Direction / Transverse" ? "" : key,
-            agents: groups[key].sort((a, b) => getPoleScore(b) - getPoleScore(a) || safeStr(a[COL_AGENT_NOM]).localeCompare(safeStr(b[COL_AGENT_NOM])))
-        }));
+        // 2. Tri des clés de groupe (Vide en premier, puis alphabétique)
+        const sortedKeys = Object.keys(groups).sort((k1, k2) => {
+            if (!k1) return -1; // Vide en premier
+            if (!k2) return 1;
+            return k1.localeCompare(k2);
+        });
 
-        renderGroupedResults(sortedGroups);
-    } 
-    // Cas 2 : Recherche textuelle ou Vue globale (Liste Plate)
-    else {
-        results.sort((a, b) => getRoleScore(b, chefName) - getRoleScore(a, chefName) || safeStr(a[COL_AGENT_NOM]).localeCompare(safeStr(b[COL_AGENT_NOM])));
-        renderFlatResults(results);
+        // 3. Tri interne à chaque groupe et construction de l'objet final
+        const sortedGroups = [];
+        sortedKeys.forEach(key => {
+            const groupAgents = groups[key];
+            groupAgents.sort((a, b) => {
+                // Utilisation du score "Pôle" si on est dans un pôle nommé, sinon score "Structure"
+                const scoreA = key ? getPoleScore(a) : getRoleScore(a, chefNameNormalized);
+                const scoreB = key ? getPoleScore(b) : getRoleScore(b, chefNameNormalized);
+
+                if (scoreA !== scoreB) return scoreB - scoreA;
+                return norm(a['Nom_d_usage_de_l_agent']).localeCompare(norm(b['Nom_d_usage_de_l_agent']));
+            });
+            sortedGroups.push({ name: key, agents: groupAgents });
+        });
+
+        // 4. Rendu Groupé
+        renderGroupedResults(sortedGroups, title, description);
+
+    } else {
+        // CAS STANDARD : Recherche texte OU Vue globale -> Liste plate triée
+        results.sort((a, b) => {
+            const scoreA = getRoleScore(a, chefNameNormalized);
+            const scoreB = getRoleScore(b, chefNameNormalized);
+
+            if (scoreA !== scoreB) return scoreB - scoreA;
+            return norm(a['Nom_d_usage_de_l_agent']).localeCompare(norm(b['Nom_d_usage_de_l_agent']));
+        });
+
+        document.getElementById('page-title').innerText = title;
+        document.getElementById('page-desc').innerHTML = description;
+        renderResults(results, title);
     }
+
+    document.getElementById('loadingMessage').style.display = 'none';
 }
 
-/**
- * ==========================================
- * ACTIONS & LOGIQUE UI
- * ==========================================
- */
-function setupEventListeners() {
-    const searchInput = document.getElementById('searchInput');
-    const searchBtn = document.getElementById('searchBtn');
-    const selectStruct = document.getElementById('select-structure');
+// Score pour le tri hierarchique global (Chef de Structure vs autres)
+function getRoleScore(agent, chefNameNormalized) {
+    const nom = safeStr(agent['Nom_d_usage_de_l_agent']);
+    const prenom = safeStr(agent['Prenom']);
+    const fullname = safeStr(prenom + " " + nom).toLowerCase().trim();
+    const fullnameRev = safeStr(nom + " " + prenom).toLowerCase().trim();
+    const fct = safeStr(agent['Fonction_de_l_agent']).toLowerCase();
 
-    if (searchBtn) searchBtn.onclick = performSearch;
-    if (searchInput) searchInput.oninput = debounce(performSearch, 300);
-    if (selectStruct) selectStruct.onchange = performSearch;
+    // 1. Est-ce le CHEF (Défini dans Structures) ?
+    if (chefNameNormalized && (fullname.includes(chefNameNormalized) || fullnameRev.includes(chefNameNormalized))) {
+        return 4;
+    }
+
+    // 2. Est-ce un ADJOINT ?
+    if (fct.includes('adj') || fct.includes('second')) {
+        return 3;
+    }
+
+    // 3. Est-ce un SECRÉTAIRE / ASSISTANT ?
+    if (fct.includes('secre') || fct.includes('assist')) {
+        return 2;
+    }
+
+    return 1;
 }
 
-window.executeTransfer = async function(agentId, uniqueId, agentName) {
-    const selectEl = document.getElementById(`select-transfer-${uniqueId}`);
-    const newStructId = parseInt(selectEl?.value);
+// Score pour le tri interne aux Pôles/Sections (Détection mots-clés)
+function getPoleScore(agent) {
+    const fct = safeStr(agent['Fonction_de_l_agent']).toLowerCase();
 
-    if (!newStructId || !confirm(`Transférer ${agentName} ?`)) return;
+    // CAS DU CHEF : Contient "chef" MAIS PAS "adjoint"
+    const isChefKeyword = fct.includes('chef') || fct.includes('responsable') || fct.includes('dirigeant') || fct.includes('tête');
+    const isAdjointKeyword = fct.includes('adj') || fct.includes('second');
 
-    try {
-        await grist.docApi.applyUserActions([
-            ["UpdateRecord", TABLE_AGENTS, agentId, { [COL_AGENT_STRUCT_REF]: newStructId }]
-        ]);
-        const agent = state.allAgents.find(a => a.id === agentId);
-        if (agent) agent[COL_AGENT_STRUCT_REF] = newStructId;
-        performSearch();
-    } catch (err) {
-        alert("Erreur lors du transfert : " + err.message);
+    if (isChefKeyword && !isAdjointKeyword) {
+        return 4;
     }
-};
 
-window.deleteAgent = async function(agentId, agentName) {
-    if (!confirm(`Supprimer définitivement ${agentName} ?`)) return;
-    try {
-        await grist.docApi.applyUserActions([["RemoveRecord", TABLE_AGENTS, agentId]]);
-        state.allAgents = state.allAgents.filter(a => a.id !== agentId);
-        performSearch();
-    } catch (err) {
-        alert("Erreur de suppression.");
+    // 2. Est-ce un ADJOINT ?
+    if (isAdjointKeyword) {
+        return 3;
     }
-};
 
-/**
- * ==========================================
- * RENDU HTML (TEMPLATES)
- * ==========================================
- */
-function renderFlatResults(agents) {
-    let html = `<div class="fr-grid-row fr-grid-row--gutters">`;
-    agents.forEach(a => html += generateAgentCardHtml(a));
-    html += `</div>`;
-    document.getElementById('resultArea').innerHTML = html;
+    // 3. Est-ce un SECRÉTAIRE / ASSISTANT ?
+    if (fct.includes('secré') || fct.includes('assist') || fct.includes('secretaire')) {
+        return 2;
+    }
+
+    return 1;
 }
 
-function renderGroupedResults(groups) {
+// ==========================================
+// RENDU DES RÉSULTATS
+// ==========================================
+
+function renderGroupedResults(groups, title, description) {
+    const container = document.getElementById('resultArea');
+    document.getElementById('page-title').innerText = title;
+    document.getElementById('page-desc').innerHTML = description;
+
+    if (groups.length === 0 || groups.every(g => g.agents.length === 0)) {
+        container.innerHTML = `<div class="fr-alert fr-alert--warning fr-mt-2w"><p>Aucun agent trouvé.</p></div>`;
+        return;
+    }
+
     let html = '';
-    groups.forEach(g => {
-        if (g.name) {
-            html += `<div class="fr-col-12 fr-mt-4w"><h3 class="fr-h5" style="border-bottom:2px solid var(--background-action-high-blue-france)">${safeHtml(g.name)}</h3></div>`;
+
+    groups.forEach(group => {
+        // En-tête de groupe (Sauf pour le groupe vide "Direction/Transverse")
+        if (group.name) {
+            html += `
+             <div class="fr-col-12 fr-mt-4w fr-mb-2w">
+                <h3 class="fr-h5" style="border-bottom: 2px solid var(--background-action-high-blue-france); padding-bottom: 0.5rem;">
+                    ${safeHtml(group.name)}
+                </h3>
+             </div>`;
         }
+
         html += `<div class="fr-grid-row fr-grid-row--gutters">`;
-        g.agents.forEach(a => html += generateAgentCardHtml(a));
+
+        // Utilisation de la logique de rendu par carte existante
+        group.agents.forEach(agent => {
+            html += generateAgentCardHtml(agent);
+        });
+
         html += `</div>`;
     });
-    document.getElementById('resultArea').innerHTML = html;
+
+    container.innerHTML = html;
 }
 
+// Génère le HTML d'une carte agent (Factorisé)
 function generateAgentCardHtml(agent) {
-    const uid = `agent-${agent.id}`;
-    const nomComplet = `${safeHtml(agent[COL_AGENT_PRENOM] || '')} ${safeHtml(agent[COL_AGENT_NOM] || '')}`;
-    const s = state.structureMap.get(agent[COL_AGENT_STRUCT_REF]);
+    // 1. Préparation des données de l'agent
+    const nom = `${safeHtml(agent[COL_AGENT_PRENOM] || '')} ${safeHtml(agent[COL_AGENT_NOM] || '')}`;
+    const fct = safeHtml(agent[COL_AGENT_FONCTION] || 'Non renseignée');
+    const mailAgent = safeHtml(agent[COL_AGENT_MAIL] || '');
     
+    // Récupération du code de la structure actuelle
+    const structId = agent[COL_AGENT_STRUCT_REF];
+    const struct = structureMap.get(structId); 
+    const structCode = struct ? safeHtml(struct[COL_STRUCT_CODE]) : '';
+
+    // Génération d'un ID unique pour isoler les éléments de cette carte
+    const uniqueId = `agent-${Math.floor(Math.random() * 1000000)}`;
+
+    // 2. Préparation de la liste des structures pour le transfert (triée par nom)
+    const optionsStructures = allStructures
+        .slice() // Copie pour ne pas modifier l'original
+        .sort((a, b) => (a[COL_STRUCT_LIBELLE] || "").localeCompare(b[COL_STRUCT_LIBELLE] || ""))
+        .map(s => `<option value="${s.id}">${safeHtml(s[COL_STRUCT_LIBELLE] || s[COL_STRUCT_CODE])}</option>`)
+        .join('');
+
+    // 3. Retour du template HTML
     return `
     <div class="fr-col-12 fr-col-md-6">
-        <div class="agent-accordion" id="${uid}">
-            <div class="agent-header" onclick="window.toggleAgent('${uid}')">
+        <div class="agent-accordion" id="${uniqueId}">
+            <div class="agent-header" onclick="window.toggleAgent('${uniqueId}')">
                 <div class="agent-info">
-                    <div style="font-weight:700;">${nomComplet} 
-                        <button class="fr-btn fr-btn--tertiary-no-outline fr-icon-edit-line" onclick="event.stopPropagation(); window.toggleMgmt('${uid}-admin')"></button>
+                    <div style="font-weight:700; font-size:0.95rem; margin-bottom:0.1rem; color: var(--text-default-grey);">
+                        ${nom}
+                        <button class="fr-btn fr-btn--tertiary-no-outline fr-icon-edit-line" 
+                                onclick="event.stopPropagation(); window.toggleMgmt('${uniqueId}-admin')" 
+                                style="margin-left: 8px; padding: 0.2rem; height: 1.5rem; min-height: 1.5rem;" 
+                                title="Modifier ou Transférer"></button>
                     </div>
-                    <div style="font-size:0.85rem; color:#666;">${safeHtml(agent[COL_AGENT_FONCTION] || 'Agent')}</div>
-                    ${s ? `<span class="fr-badge fr-badge--sm fr-badge--info fr-mt-1w">${safeHtml(s[COL_STRUCT_CODE])}</span>` : ''}
+                    <div style="font-size:0.8rem; color: var(--text-mention-grey);">${fct}</div>
+                    ${structCode ? `<div class="fr-badge fr-badge--sm fr-badge--info fr-mb-1v fr-mt-1w">${structCode}</div>` : ''}
                 </div>
                 <span class="fr-icon-arrow-down-s-line agent-arrow"></span>
             </div>
-            <div id="${uid}-admin" class="admin-panel" style="display:none; flex-direction:column; background:#f6f6f6; padding:1rem; gap:1rem; border-bottom:1px solid #ddd;">
-                <div style="display:flex; gap:0.5rem; align-items:flex-end;">
-                    <div class="fr-select-group" style="flex-grow:1; margin-bottom:0;">
-                        <label class="fr-label" style="font-size:0.7rem;">TRANSFÉRER VERS :</label>
-                        <select class="fr-select fr-select--sm" id="select-transfer-${uid}" onclick="event.stopPropagation()">
-                            ${state.allStructures.map(st => `<option value="${st.id}">${safeHtml(st[COL_STRUCT_LIBELLE])}</option>`).join('')}
-                        </select>
+
+            <div id="${uniqueId}-admin" style="display:none; background: #f0f0f0; padding: 1rem; border-bottom: 1px solid #ddd; border-top: 1px solid #ddd;">
+                <div style="display: flex; flex-direction: column; gap: 1rem;">
+                    
+                    <div style="display: flex; gap: 0.5rem; align-items: flex-end;">
+                        <div class="fr-select-group" style="margin-bottom: 0; flex-grow: 1;">
+                            <label class="fr-label" style="font-size: 0.75rem; font-weight: bold;">TRANSFÉRER VERS :</label>
+                            <select class="fr-select fr-select--sm" id="select-transfer-${uniqueId}" onclick="event.stopPropagation()">
+                                <option value="" selected disabled>Choisir un bureau...</option>
+                                ${optionsStructures}
+                            </select>
+                        </div>
+                        <button class="fr-btn fr-btn--sm fr-icon-checkbox-circle-line" 
+                                style="background-color: var(--background-action-high-blue-france);"
+                                onclick="event.stopPropagation(); window.executeTransfer(${agent.id}, '${uniqueId}', '${nom.replace(/'/g, "\\'")}')"
+                                title="Valider le transfert"></button>
                     </div>
-                    <button class="fr-btn fr-btn--sm fr-icon-checkbox-circle-line" onclick="event.stopPropagation(); window.executeTransfer(${agent.id}, '${uid}', '${nomComplet.replace(/'/g, "\\'")}')"></button>
+
+                    <div style="text-align: right; border-top: 1px path solid #e5e5e5; pt-1w;">
+                        <button class="fr-btn fr-btn--sm fr-btn--secondary fr-icon-delete-line fr-btn--icon-left" 
+                                style="color: var(--text-default-error); box-shadow: inset 0 0 0 1px var(--text-default-error);"
+                                onclick="event.stopPropagation(); window.deleteAgent(${agent.id}, '${nom.replace(/'/g, "\\'")}')">
+                            Supprimer l'agent
+                        </button>
+                    </div>
                 </div>
-                <button class="fr-btn fr-btn--sm fr-btn--secondary fr-icon-delete-line" onclick="event.stopPropagation(); window.deleteAgent(${agent.id}, '${nomComplet.replace(/'/g, "\\'")}')">Supprimer</button>
             </div>
-            <div class="agent-details" style="padding:1rem; font-size:0.9rem;">
-                <div><strong>Email :</strong> ${agent[COL_AGENT_MAIL] ? `<a href="mailto:${agent[COL_AGENT_MAIL].toLowerCase()}">${agent[COL_AGENT_MAIL].toLowerCase()}</a>` : '-'}</div>
+
+            <div class="agent-details">
+                <div class="details-grid" style="padding: 1rem;">
+                    <div class="detail-item">
+                        <span class="detail-label" style="font-size: 0.7rem; text-transform: uppercase; color: #666;">Fonction</span>
+                        <div class="detail-value" style="font-weight: 500;">${fct}</div>
+                    </div>
+                    <div class="detail-item" style="grid-column: span 2; margin-top: 0.5rem;">
+                        <span class="detail-label" style="font-size: 0.7rem; text-transform: uppercase; color: #666;">Email</span>
+                        <div class="detail-value">
+                             ${mailAgent ? `
+                                <button onclick="event.stopPropagation(); copyToClipboard('${mailAgent.toLowerCase()}', this)" 
+                                        style="background:none; border:none; padding:0; color:var(--text-action-high-blue-france); cursor:pointer; text-decoration:underline; font-size: 0.9rem;">
+                                    ${mailAgent.toLowerCase()}
+                                </button>` : '-'}
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>`;
 }
 
-/**
- * ==========================================
- * FONCTIONS UTILITAIRES (HELPERS)
- * ==========================================
- */
-function safeStr(val) { return val ? String(val).trim() : ""; }
-function safeHtml(val) { 
-    const txt = safeStr(val);
-    const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
-    return txt.replace(/[&<>"']/g, m => map[m]);
+function renderResults(agents, title) {
+    const container = document.getElementById('resultArea');
+
+    if (agents.length === 0) {
+        container.innerHTML = `
+            <div class="fr-alert fr-alert--warning fr-mt-2w">
+                <p>Aucun agent trouvé correspondant à vos critères.</p>
+            </div>`;
+        return;
+    }
+
+    let html = `<h2 class="fr-h6 fr-mb-2w fr-mt-2w">${safeHtml(title)}</h2>`;
+    html += `<div class="fr-grid-row fr-grid-row--gutters">`;
+
+    agents.forEach(agent => {
+        // Appelle la fonction de génération de carte qui contient maintenant le bouton
+        html += generateAgentCardHtml(agent);
+    });
+
+    html += `</div>`;
+    container.innerHTML = html;
 }
 
-function debounce(fn, delay) {
-    let timeout;
-    return (...args) => {
-        clearTimeout(timeout);
-        timeout = setTimeout(() => fn.apply(this, args), delay);
-    };
-}
-
-function getRoleScore(agent, chefName) {
-    const fct = safeStr(agent[COL_AGENT_FONCTION]).toLowerCase();
-    const full = `${safeStr(agent[COL_AGENT_PRENOM])} ${safeStr(agent[COL_AGENT_NOM])}`.toLowerCase();
-    if (chefName && full.includes(chefName)) return 4;
-    if (fct.includes('adj') || fct.includes('second')) return 3;
-    if (fct.includes('secre') || fct.includes('assist')) return 2;
-    return 1;
-}
-
-function getPoleScore(agent) {
-    const fct = safeStr(agent[COL_AGENT_FONCTION]).toLowerCase();
-    if ((fct.includes('chef') || fct.includes('resp')) && !fct.includes('adj')) return 4;
-    if (fct.includes('adj')) return 3;
-    return 1;
-}
-
-window.toggleAgent = (id) => document.getElementById(id)?.classList.toggle('open');
-window.toggleMgmt = (id) => {
-    const el = document.getElementById(id);
-    if (el) el.style.display = (el.style.display === 'none' || el.style.display === '') ? 'flex' : 'none';
+// Fonction pour afficher/cacher le panneau de gestion
+window.toggleMgmt = function(adminId) {
+    const panel = document.getElementById(adminId);
+    if (panel) {
+        // Alterne entre 'none' et 'flex'
+        const isHidden = (panel.style.display === 'none' || panel.style.display === '');
+        panel.style.display = isHidden ? 'flex' : 'none';
+        console.log("Bascule du panneau :", adminId, isHidden ? "Affiché" : "Caché");
+    }
 };
 
-function updateURL() {
-    const qs = new URLSearchParams();
-    if (state.filters.structureId) qs.set('structure', state.filters.structureId);
-    if (state.filters.textQuery) qs.set('q', state.filters.textQuery);
-    const newUrl = qs.toString() ? `?${qs.toString()}` : window.location.pathname;
-    window.history.replaceState({}, '', newUrl);
+async function deleteAgent(agentId, agentName) {
+    if (!agentId) {
+        console.error("ID de l'agent manquant");
+        return;
+    }
+
+    const confirmation = confirm(`Confirmer la suppression définitive de : ${agentName} ?`);
+    if (!confirmation) return;
+
+    try {
+        console.log(`Tentative de suppression de l'ID: ${agentId} sur la table: ${TABLE_AGENTS}`);
+        
+        // Nouvelle méthode : Envoi d'une action brute à Grist
+        await grist.docApi.applyUserActions([
+            ["RemoveRecord", TABLE_AGENTS, agentId]
+        ]);
+
+        console.log("Suppression réussie côté Grist");
+
+        // Mise à jour de l'affichage local
+        allAgents = allAgents.filter(a => a.id !== agentId);
+        
+        // On force le rendu pour faire disparaître la carte
+        if (typeof performSearch === 'function') {
+            performSearch();
+        } else {
+            // Si performSearch n'est pas accessible, on vide juste la zone et on recharge
+            document.getElementById('resultArea').innerHTML = "";
+            location.reload(); 
+        }
+
+        alert("Agent supprimé.");
+    } catch (error) {
+        console.error("Détails de l'erreur Grist:", error);
+        alert(`Erreur : ${error.message}\n\nAssurez-vous que le widget est bien en 'Access Level: Full' dans les paramètres Grist.`);
+    }
+}
+// Fonction pour transférer un agent
+window.executeTransfer = async function(agentId, uniqueId, agentName) {
+    const selectEl = document.getElementById(`select-transfer-${uniqueId}`);
+    const newStructureId = parseInt(selectEl.value);
+
+    if (!newStructureId) {
+        alert("Veuillez sélectionner un bureau de destination.");
+        return;
+    }
+
+    if (!confirm(`Confirmer le transfert de ${agentName} ?`)) return;
+
+    try {
+        await grist.docApi.applyUserActions([
+            ["UpdateRecord", TABLE_AGENTS, agentId, {
+                [COL_AGENT_STRUCT_REF]: newStructureId 
+            }]
+        ]);
+
+        alert("Transfert réussi.");
+        
+        // Mise à jour locale pour éviter de tout recharger
+        const agent = allAgents.find(a => a.id === agentId);
+        if (agent) agent[COL_AGENT_STRUCT_REF] = newStructureId;
+        
+        performSearch(); // Rafraîchit l'affichage
+    } catch (error) {
+        console.error("Erreur transfert:", error);
+        alert("Erreur lors du transfert. Vérifiez vos droits d'accès.");
+    }
+};
+// ==========================================
+// GESTION DE L'INTERFACE (UI) & ACTIONS
+// ==========================================
+
+// Affiche/Masque le formulaire d'ajout (utilisé par le bouton "Nouvel Agent")
+window.toggleForm = function() {
+    const form = document.getElementById('form-creation-agent');
+    if (form) {
+        const isHidden = (form.style.display === 'none' || form.style.display === '');
+        form.style.display = isHidden ? 'block' : 'none';
+    }
+};
+
+// Gère l'ouverture des accordéons d'agents
+window.toggleAgent = function(id) {
+    const el = document.getElementById(id);
+    if (el) el.classList.toggle('open');
+};
+
+// Action : Transférer un agent
+window.executeTransfer = async function(agentId, uniqueId, agentName) {
+    const selectEl = document.getElementById(`select-transfer-${uniqueId}`);
+    const newStructureId = selectEl ? parseInt(selectEl.value) : null;
+
+    if (!newStructureId) {
+        alert("Veuillez sélectionner un bureau dans la liste.");
+        return;
+    }
+
+    if (!confirm(`Transférer ${agentName} ?`)) return;
+
+    try {
+        await grist.docApi.applyUserActions([
+            ["UpdateRecord", TABLE_AGENTS, agentId, {
+                [COL_AGENT_STRUCT_REF]: newStructureId 
+            }]
+        ]);
+        alert("Transfert réussi !");
+        location.reload(); 
+    } catch (error) {
+        console.error("Erreur transfert:", error);
+        alert("Erreur : Vérifiez vos droits d'accès.");
+    }
+};
+
+// ==========================================
+// LOGIQUE ADMINISTRATION (AJOUT AGENT)
+// ==========================================
+
+// Branchement des boutons du panneau d'admin
+function setupAdminEvents() {
+    const btnShow = document.getElementById('btn-show-form');
+    const btnCancel = document.getElementById('btn-cancel');
+    const btnSave = document.getElementById('btn-save');
+
+    if (btnShow) btnShow.onclick = window.toggleForm;
+    
+    if (btnCancel) {
+        btnCancel.onclick = () => {
+            document.getElementById('form-creation-agent').style.display = 'none';
+        };
+    }
+
+    if (btnSave) btnSave.onclick = handleSaveAgent;
 }
 
-function populateSelects() {
-    const mainSelect = document.getElementById('select-structure');
-    if (!mainSelect) return;
-    const options = state.allStructures.map(s => `<option value="${s.id}">${safeHtml(s[COL_STRUCT_LIBELLE])}</option>`).sort();
-    mainSelect.innerHTML = '<option value="">Toutes les structures</option>' + options.join('');
+// Remplit le menu déroulant des structures
+const populateAdminSelect = () => {
+    const select = document.getElementById('field-struct');
+    if (!select || !window.allStructures || allStructures.length === 0) return;
+
+    let html = '<option value="" disabled selected>Choisir une structure...</option>';
+    allStructures.forEach(s => {
+        const label = s[COL_STRUCT_LIBELLE] || s[COL_STRUCT_CODE] || "Bureau";
+        html += `<option value="${s.id}">${label}</option>`;
+    });
+    select.innerHTML = html;
+};
+
+// Sauvegarde effective dans Grist
+async function handleSaveAgent() {
+    const data = {
+        prenom: document.getElementById('field-prenom').value.trim(),
+        nom: document.getElementById('field-nom').value.trim(),
+        fct: document.getElementById('field-fct').value.trim(),
+        struct: parseInt(document.getElementById('field-struct').value),
+        form: document.getElementById('field-formation').value.trim()
+    };
+
+    if (!data.nom || isNaN(data.struct)) {
+        alert("⚠️ Le NOM et la STRUCTURE sont obligatoires.");
+        return;
+    }
+
+    try {
+        await grist.docApi.applyUserActions([
+            ["AddRecord", TABLE_AGENTS, null, {
+                [COL_AGENT_PRENOM]: data.prenom,
+                [COL_AGENT_NOM]: data.nom,
+                [COL_AGENT_FONCTION]: data.fct,
+                [COL_AGENT_STRUCT_REF]: data.struct,
+                "Formations": data.form 
+            }]
+        ]);
+        alert("✅ Agent ajouté avec succès !");
+        location.reload(); 
+    } catch (err) {
+        console.error("Erreur Grist:", err);
+        alert("❌ Erreur : vérifiez les noms de colonnes Grist (ex: 'Formations').");
+    }
 }
 
-function syncFiltersWithUI() {
-    if (state.filters.structureId) document.getElementById('select-structure').value = state.filters.structureId;
-    if (state.filters.textQuery) document.getElementById('searchInput').value = state.filters.textQuery;
-}
+// Initialisation automatique
+const adminInitInterval = setInterval(() => {
+    if (document.getElementById('btn-show-form') && window.allStructures) {
+        setupAdminEvents();
+        populateAdminSelect();
+        clearInterval(adminInitInterval);
+    }
+}, 500);

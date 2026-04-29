@@ -1,250 +1,520 @@
-/**
- * ==========================================
- * ÉTAT GLOBAL & PARAMÈTRES
- * ==========================================
- */
-let state = {
-    agents: [],
-    structures: [],
-    structureMap: new Map(),
-    hierarchyMap: new Map()
-};
+// ==========================================
+// INITIALISATION
+// ==========================================
+// Ce fichier gère toute la logique métier de l'organigramme DNE :
+// - Récupération des données depuis Grist
+// - Transformation et optimisation des données
+// - Rendu dynamique de l'interface
+// - Gestion des interactions utilisateur (recherche, modale, etc.)
 
-// Initialisation Grist
-grist.ready({ requiredAccess: 'full' });
+// Note : Les constantes (noms de colonnes, tables, etc.) sont définies dans utils.js
 
-// Démarrage
+// Initialisation du plugin Grist avec accès en lecture
+grist.ready({ 
+  requiredAccess: 'full',
+  onRecords: function(records) {
+    // Cette fonction optionnelle peut aider à stabiliser la connexion
+  }
+});
+
+
+
+// Lancement de la fonction principale après chargement du DOM
 document.addEventListener('DOMContentLoaded', init);
 
+// Variables globales (cache des données)
+let allAgents = [];              // Liste complète des agents
+let allStructures = [];          // Liste des structures (bureaux)
+let structureMap = new Map();    // Accès rapide aux structures (O(1))
+let agentsHierarchyMap = new Map(); // Accès rapide à la hiérarchie des agents
+
 /**
- * ==========================================
- * INITIALISATION PRINCIPALE
- * ==========================================
+ * Fonction principale d'initialisation
+ * - Charge les données
+ * - Prépare les structures
+ * - Lance le rendu de l'interface
  */
 async function init() {
     try {
-        console.log("🚀 Initialisation de l'Organigramme...");
+        console.log("Chargement Organigramme ...");
 
-        // 1. Chargement des données
+        // ==========================================
+        // 1. RÉCUPÉRATION DES DONNÉES GRIST
+        // ==========================================
         const tables = [TABLE_AGENTS, TABLE_STRUCTURES, TABLE_CONFIG_LOGO];
-        const rawData = {};
+        const data = {};
 
+        // Chargement parallèle des tables
         await Promise.all(tables.map(async (name) => {
             try {
                 const result = await grist.docApi.fetchTable(name);
-                rawData[name] = window.transformColsToRows ? window.transformColsToRows(result) : result;
+
+                // Transformation colonnes -> lignes
+                data[name] = window.transformColsToRows(result);
             } catch (err) {
-                console.warn(`Table ${name} indisponible.`);
-                rawData[name] = [];
+                console.warn(`Table ${name} non trouvée ou inaccessible.`, err);
+
+                // Fallback si la table n'existe pas
+                data[name] = [];
             }
+
+            
         }));
 
-        // 2. Traitement des données
-        state.agents = window.enrichAgentsData ? window.enrichAgentsData(rawData[TABLE_AGENTS]) : rawData[TABLE_AGENTS];
-        state.structures = rawData[TABLE_STRUCTURES];
-        state.structureMap = window.createStructureMap ? window.createStructureMap(state.structures) : new Map(state.structures.map(s => [s.id, s]));
-        state.hierarchyMap = window.createAgentsHierarchyMap ? window.createAgentsHierarchyMap(state.agents) : new Map();
 
-        // 3. Rendu Interface
-        applyLogoConfig(rawData[TABLE_CONFIG_LOGO]);
-        renderOrganigramme();
-        initQuickSearch();
-        setupAdminSystem(); // Appelé directement ici au lieu du setInterval
 
-        // Exposition pour modules externes (PDF, etc.)
-        window.getOrganigrammeData = () => ({ agents: state.agents, structures: state.structures });
+
+        // ==========================================
+        // 2. PRÉPARATION ET OPTIMISATION DES DONNÉES
+        // ==========================================
+
+        // Enrichissement des agents (normalisation des noms, etc.)
+        allAgents = window.enrichAgentsData(data[TABLE_AGENTS]);
+
+        // Création d'un index pour la hiérarchie (recherche rapide)
+        agentsHierarchyMap = window.createAgentsHierarchyMap(allAgents);
+
+        // Structures (bureaux)
+        allStructures = data[TABLE_STRUCTURES];
+
+        // Index des structures (accès rapide par ID)
+        structureMap = window.createStructureMap(allStructures);
+
+        
+        console.log("Agents :", allAgents);
+        console.log("Structures :", allStructures);
+
+        // ==========================================
+        // 3. CONFIGURATION DU LOGO
+        // ==========================================
+        applyLogoConfig(data[TABLE_CONFIG_LOGO]);
+
+        // ==========================================
+        // 4. RENDU DE L'INTERFACE
+        // ==========================================
+
+        renderTopZone();   // Zone supérieure (direction, cabinet...)
+        renderColumns();   // Colonnes principales
+        initQuickSearch(); // Recherche rapide
+
+        // ==========================================
+        // 5. EXPOSITION DES DONNÉES (POUR PDF / AUTRES MODULES)
+        // ==========================================
+        window.getOrganigrammeData = () => ({
+            agents: allAgents,
+            structures: allStructures
+        });
 
     } catch (e) {
-        console.error("ERREUR CRITIQUE :", e);
-        const grid = document.querySelector('.main-grid');
-        if(grid) grid.innerHTML = `<div class="fr-alert fr-alert--error">${e.message}</div>`;
+        console.error("ERREUR :", e);
+
+        // Affichage d'une erreur dans l'interface
+        document.querySelector('.main-grid').innerHTML =
+            `<div class="fr-alert fr-alert--error">${e.message}</div>`;
+    }
+} 
+
+
+
+// ==========================================
+// CONFIGURATION LOGO
+// ==========================================
+/**
+ * Applique la configuration du logo depuis Grist
+ * - Masquage du logo
+ * - Personnalisation du texte
+ */
+function applyLogoConfig(configData) {
+
+    // Si aucune configuration, on ne fait rien
+    if (!configData || configData.length === 0) return;
+
+    // On prend la première ligne de config
+    const configRow = configData[0];
+
+    const logoContainer = document.querySelector('.fr-header__logo');
+    if (!logoContainer) return;
+
+    // 1. Masquer le logo
+    if (configRow[COL_CONFIG_MASQUER_LOGO]) {
+        logoContainer.style.display = 'none';
+        return;
+    }
+
+    // 2. Modifier le texte du logo
+    const customText = safeStr(configRow[COL_CONFIG_TEXTE_LOGO]).trim();
+
+    if (customText) {
+        const pLogo = logoContainer.querySelector('.fr-logo');
+
+        if (pLogo) {
+            // Sécurisation HTML + gestion des retours à la ligne
+            pLogo.innerHTML = safeHtml(customText).replace(/\n/g, '<br>');
+        }
+    }
+}
+
+// ==========================================
+// RENDU VISUEL (GRILLE)
+// ==========================================
+
+// Affiche la zone supérieure (DG, cabinet, etc.)
+function renderTopZone() {
+
+    // Zone gauche
+    const left = document.getElementById('top-left');
+    if (left) getStructuresByPos('TOP_LEFT')
+        .forEach(s => createDsfrTile(left, s));
+
+    // Zone centrale (chef)
+    const center = document.getElementById('top-center');
+    const centerStructs = getStructuresByPos('TOP_CENTER');
+
+    if (center && centerStructs.length > 0)
+        createDsfrTile(center, centerStructs[0], 'tile-chef');
+
+    // Zone droite
+    const right = document.getElementById('top-right');
+    if (right) getStructuresByPos('TOP_RIGHT')
+        .forEach(s => createDsfrTile(right, s));
+}
+
+// Affiche les colonnes principales (1 à 5)
+function renderColumns() {
+    for (let i = 1; i <= 5; i++) { 
+        const container = document.getElementById(`col-${i}`);
+        if (!container) continue;
+
+        // Tête de colonne
+        const heads = getStructuresByPos(`COL${i}_HEAD`);
+        if (heads.length > 0)
+            createDsfrTile(container, heads[0], 'tile-head');
+
+        // Sous-structures
+        const subs = getStructuresByPos(`COL${i}_SUB`);
+        subs.forEach(sub => createDsfrTile(container, sub));
     }
 }
 
 /**
- * ==========================================
- * RENDU VISUEL
- * ==========================================
+ * Création d'une tuile DSFR représentant une structure
  */
-function renderOrganigramme() {
-    // Rendu des zones TOP
-    const zones = {
-        'top-left': 'TOP_LEFT',
-        'top-center': 'TOP_CENTER',
-        'top-right': 'TOP_RIGHT'
-    };
-
-    Object.entries(zones).forEach(([id, pos]) => {
-        const container = document.getElementById(id);
-        if (!container) return;
-        const structs = getStructuresByPos(pos);
-        structs.forEach((s, i) => createDsfrTile(container, s, id === 'top-center' && i === 0 ? 'tile-chef' : ''));
-    });
-
-    // Rendu des Colonnes (1 à 5)
-    for (let i = 1; i <= 5; i++) {
-        const col = document.getElementById(`col-${i}`);
-        if (!col) continue;
-        
-        getStructuresByPos(`COL${i}_HEAD`).forEach(s => createDsfrTile(col, s, 'tile-head'));
-        getStructuresByPos(`COL${i}_SUB`).forEach(s => createDsfrTile(col, s));
-    }
-}
-
 function createDsfrTile(container, struct, extraClass = '') {
-    const code = safeHtml(struct[COL_STRUCT_CODE]);
-    const libelle = safeHtml(struct[COL_STRUCT_LIBELLE] || "Sans nom");
-    const resp = safeHtml(window.findResponsableName(struct, state.hierarchyMap));
-    
-    if (safeStr(struct[COL_STRUCT_STYLE]).toLowerCase().includes('pointill')) extraClass += ' tile-dashed';
 
-    const tile = document.createElement('div');
-    tile.className = `fr-tile fr-enlarge-link fr-tile--no-icon ${extraClass}`;
-    tile.innerHTML = `
-        ${code ? `<div class="tile-header">${code}</div>` : ''}
+    // Données sécurisées
+    const codeBureau = window.safeHtml(struct[COL_STRUCT_CODE]).trim();
+    const libelle = window.safeHtml(struct[COL_STRUCT_LIBELLE], "Sans nom");
+    const resp = window.safeHtml(window.findResponsableName(struct, agentsHierarchyMap));
+    const specialStyle = window.safeStr(struct[COL_STRUCT_STYLE]).toLowerCase();
+
+    // Style particulier (pointillé)
+    if (specialStyle.includes('pointill')) {
+        extraClass += ' tile-dashed';
+    }
+
+    const div = document.createElement('div');
+
+    // Classe DSFR + custom
+    div.className = `fr-tile fr-enlarge-link fr-tile--no-icon ${extraClass}`;
+
+    // Header (code bureau)
+    const headerHtml = codeBureau
+        ? `<div class="tile-header">${codeBureau}</div>`
+        : '';
+
+    // Bloc responsable
+    let respHtml = '';
+    if (resp) {
+        respHtml = `
+        <div class="tile-resp-container">
+            <div class="tile-separator"></div>
+            <span class="tile-resp-name">${resp}</span>
+        </div>`;
+    }
+
+    // HTML final de la tuile
+    div.innerHTML = `
+        ${headerHtml}
         <div class="fr-tile__body">
             <div class="fr-tile__content">
-                <h3 class="fr-tile__title"><a href="#">${libelle}</a></h3>
+                <h3 class="fr-tile__title">
+                    <a href="#">${libelle}</a>
+                </h3>
             </div>
-            ${resp ? `<div class="tile-resp-container"><div class="tile-separator"></div><span class="tile-resp-name">${resp}</span></div>` : ''}
-        </div>`;
+            ${respHtml}
+        </div>
+    `;
 
-    tile.querySelector('a').onclick = (e) => { e.preventDefault(); openModalForStructure(struct.id); };
-    container.appendChild(tile);
+    // Gestion du clic -> ouverture modale
+    div.querySelector('a').addEventListener('click', (e) => {
+        e.preventDefault();
+        openModalForStructure(struct.id);
+    });
+
+    container.appendChild(div);
 }
 
+// ==========================================
+// MODALE DE DÉTAIL
+// ==========================================
+
 /**
- * ==========================================
- * MODALE & DÉTAILS
- * ==========================================
+ * Ouvre la modale pour une structure donnée
  */
 window.openModalForStructure = function (structId) {
-    const struct = state.structureMap.get(structId);
+    if (!structId) return;
+    const struct = allStructures.find(s => s.id === structId);
     if (!struct) return;
 
-    const respName = window.findResponsableName(struct, state.hierarchyMap);
+    const title = safeStr(struct[COL_STRUCT_LIBELLE]);
+    const respNameRaw = findResponsableName(struct, agentsHierarchyMap);
+    const respName = safeHtml(respNameRaw);
+
+    // Recherche des détails de l'agent responsable (via cache normalisé)
     let respAgent = null;
-    
-    if (respName) {
-        const target = window.normalizeString(respName);
-        respAgent = state.agents.find(a => (a._fullname?.includes(target)) || (a._fullnameReverse?.includes(target)));
+    if (respNameRaw) {
+        const target = window.normalizeString(respNameRaw);
+        respAgent = allAgents.find(a =>
+            (a._fullname && a._fullname.includes(target)) ||
+            (a._fullnameReverse && a._fullnameReverse.includes(target))
+        );
     }
 
-    let html = '';
-    if (respName) {
-        const email = safeHtml(respAgent?.[COL_AGENT_MAIL] || "").toLowerCase();
-        html = `
+    let htmlContent = '';
+
+    // ==========================================
+    // 1. CARTE RESPONSABLE
+    // ==========================================
+    if (respNameRaw) {
+
+        const fct = respAgent ? safeHtml(respAgent[COL_AGENT_FONCTION]) : "Responsable";
+        const emailAgent = respAgent ? safeHtml(respAgent[COL_AGENT_MAIL]) : "";
+        const emailGeneric = respAgent ? safeHtml(respAgent['Mail_generique']) : "";
+        const tel = respAgent ? safeHtml(respAgent[COL_AGENT_TEL]) : "";
+        const mobile = respAgent ? safeHtml(respAgent['Tel_PORT']) : "";
+
+        htmlContent += `
         <div class="fr-card fr-card--no-border fr-mb-2w">
-            <div class="fr-card__body"><div class="fr-card__content">
-                <h3 class="fr-card__title"><span class="fr-icon-user-star-line fr-mr-1w"></span>${safeHtml(respName)}</h3>
-                <p class="fr-card__desc text-bold">${safeHtml(respAgent?.[COL_AGENT_FONCTION] || "Responsable")}</p>
-                <div class="fr-card__start">
-                    <ul class="fr-badges-group">
-                        ${email ? `<li><button onclick="copyToClipboard('${email}', this)" class="fr-badge fr-badge--info copy-btn">${email}</button></li>` : ''}
-                        ${respAgent?.['Tel_PORT'] ? `<li><span class="fr-badge fr-badge--info">Mob. : ${respAgent['Tel_PORT']}</span></li>` : ''}
-                    </ul>
+            <div class="fr-card__body">
+                <div class="fr-card__content">
+                    <h3 class="fr-card__title">
+                        <span class="fr-icon-user-star-line fr-mr-1w"></span>
+                        ${respName}
+                    </h3>
+                    <p class="fr-card__desc text-bold">${fct}</p>
+                    <div class="fr-card__start">
+                        <ul class="fr-badges-group">
+
+                             ${emailAgent ? `<li><button onclick="copyToClipboard('${emailAgent.toLowerCase()}', this)" class="fr-badge fr-badge--info fr-badge--no-icon copy-btn">${emailAgent.toLowerCase()}</button></li>` : ''}
+
+                             ${emailGeneric ? `<li><button onclick="copyToClipboard('${emailGeneric.toLowerCase()}', this)" class="fr-badge fr-badge--purple-glycine fr-badge--no-icon copy-btn">Générique : ${emailGeneric.toLowerCase()}</button></li>` : ''}
+
+                             ${tel ? `<li><button onclick="copyToClipboard('${tel}', this)" class="fr-badge fr-badge--info fr-badge--no-icon copy-btn">Fixe : ${tel}</button></li>` : ''}
+
+                             ${mobile ? `<li><button onclick="copyToClipboard('${mobile}', this)" class="fr-badge fr-badge--info fr-badge--no-icon copy-btn">Mob. : ${mobile}</button></li>` : ''}
+
+                        </ul>
+                    </div>
                 </div>
-            </div></div>
-        </div>`;
+            </div>
+        </div>
+        `;
     } else {
-        html = `<div class="fr-alert fr-alert--warning"><p>Aucun responsable identifié.</p></div>`;
+        htmlContent += `
+            <div class="fr-alert fr-alert--warning fr-mb-2w">
+                <p>Aucun responsable identifié pour ce service.</p>
+            </div>
+        `;
     }
 
-    html += `<div class="fr-grid-row fr-grid-row--center fr-mt-3w">
-                <a href="search.html?structure=${structId}" class="fr-btn fr-btn--secondary">Voir toute l'équipe</a>
-             </div>`;
+    // ==========================================
+    // 2. LIEN VERS PAGE DÉTAIL
+    // ==========================================
+    htmlContent += `
+        <div class="fr-grid-row fr-grid-row--center fr-mt-3w">
+            <a href="search.html?structure=${structId}" class="fr-btn fr-btn--secondary">
+                Voir toute l'équipe
+            </a>
+        </div>
+    `;
 
-    document.getElementById('modal-title').innerText = struct[COL_STRUCT_LIBELLE];
-    document.getElementById('modal-body').innerHTML = html;
+    // Injection dans la modale
+    document.getElementById('modal-title').innerText = title;
+    document.getElementById('modal-body').innerHTML = htmlContent;
+
+    // Ouverture via DSFR
     document.getElementById('dsfr-hidden-modal-btn').click();
 };
 
-/**
- * ==========================================
- * ADMINISTRATION (AJOUT AGENT)
- * ==========================================
- */
+// ==========================================
+// UTILITAIRES
+// ==========================================
+
+// Filtrer les structures par position
+function getStructuresByPos(code) {
+    return allStructures.filter(s =>
+        window.safeStr(s[COL_STRUCT_POSITION]).trim() === code
+    );
+}
+
+// ==========================================
+// RECHERCHE RAPIDE
+// ==========================================
+function initQuickSearch() {
+
+    const select = document.getElementById('quick-select-structure');
+    if (!select) return;
+
+    // Création des options du select
+    const options = allStructures.map(struct => {
+
+        const code = window.safeStr(struct['Structure']).trim();
+        const libelle = window.safeStr(struct[COL_STRUCT_LIBELLE]).trim();
+
+        let label = libelle;
+
+        if (code && code.toLowerCase() !== libelle.toLowerCase()) {
+            label = `${code} - ${libelle} `;
+        }
+
+        return { id: struct.id, label: label };
+    });
+
+    // Tri alphabétique
+    options.sort((a, b) =>
+        a.label.localeCompare(b.label, 'fr', { sensitivity: 'base' })
+    );
+
+    // Injection dans le select
+    options.forEach(opt => {
+        const option = document.createElement('option');
+        option.value = opt.id;
+        option.textContent = opt.label;
+        select.appendChild(option);
+    });
+
+    // Gestion des événements
+    const btn = document.getElementById('quick-search-btn');
+    const input = document.getElementById('quick-search-input');
+
+    if (btn) {
+
+        btn.addEventListener('click', triggerQuickSearch);
+
+        input.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') triggerQuickSearch();
+        });
+
+        function triggerQuickSearch() {
+
+            const structId = select.value;
+            const query = input.value.trim();
+
+            const params = new URLSearchParams();
+
+            if (structId) params.set('structure', structId);
+            if (query) params.set('q', query);
+
+            const queryString = params.toString();
+
+            // Redirection vers page de recherche
+            window.location.href = queryString
+                ? `search.html?${queryString}`
+                : 'search.html';
+        }
+    }
+}
+
+
+// --- NOUVELLE STRATÉGIE D'ADMINISTRATION ---
+
 function setupAdminSystem() {
     const btnShow = document.getElementById('btn-show-form');
-    if (!btnShow) return; // Sécurité si l'élément n'est pas dans le DOM
-
+    const btnCancel = document.getElementById('btn-cancel');
+    const btnSync = document.getElementById('btn-sync-struct');
+    const btnSave = document.getElementById('btn-save');
     const formZone = document.getElementById('form-creation-agent');
     const structSelect = document.getElementById('field-struct');
-    const btnSave = document.getElementById('btn-save');
 
-    btnShow.onclick = () => {
-        formZone.style.display = 'block';
-        // Auto-remplissage des structures au premier clic
-        if (structSelect.options.length <= 1) fillStructureSelect(structSelect);
+    // 1. Afficher / Masquer le formulaire
+    btnShow.onclick = () => formZone.style.display = 'block';
+    btnCancel.onclick = () => formZone.style.display = 'none';
+
+    // 2. Fonction de remplissage de la liste (La Philosophie "On-Demand")
+    const fillStructures = () => {
+        // On récupère les structures depuis l'endroit où Grist les stocke (window.allStructures)
+        const data = window.allStructures || [];
+        
+        if (data.length === 0) {
+            alert("Les données ne sont pas encore prêtes. Réessayez dans 2 secondes.");
+            return;
+        }
+
+        structSelect.innerHTML = '<option value="" disabled selected>Choisir un bureau...</option>';
+        
+        // Tri alphabétique
+        const sorted = [...data].sort((a, b) => 
+            (a[COL_STRUCT_LIBELLE] || "").localeCompare(b[COL_STRUCT_LIBELLE] || "")
+        );
+
+        sorted.forEach(s => {
+            const opt = document.createElement('option');
+            opt.value = s.id;
+            opt.textContent = s[COL_STRUCT_LIBELLE];
+            structSelect.appendChild(opt);
+        });
+        
+        btnSync.classList.remove('fr-icon-refresh-line');
+        btnSync.classList.add('fr-icon-check-line'); // Signale que c'est chargé
     };
 
-    document.getElementById('btn-cancel').onclick = () => formZone.style.display = 'none';
+    // Synchronisation manuelle au clic sur le bouton bleu
+    btnSync.onclick = fillStructures;
 
+    // 3. Sauvegarde
     btnSave.onclick = async () => {
         const payload = {
             prenom: document.getElementById('field-prenom').value.trim(),
             nom: document.getElementById('field-nom').value.trim(),
             fct: document.getElementById('field-fct').value.trim(),
-            struct: parseInt(structSelect.value)
+            struct: parseInt(structSelect.value),
+            form: document.getElementById('field-formation').value.trim()
         };
 
-        if (!payload.nom || isNaN(payload.struct)) return alert("Nom et Structure obligatoires.");
+        if (!payload.nom || isNaN(payload.struct)) {
+            alert("⚠️ Le NOM et la STRUCTURE sont obligatoires.");
+            return;
+        }
 
         try {
             btnSave.disabled = true;
+            btnSave.textContent = "Envoi...";
+            
             await grist.docApi.applyUserActions([
                 ["AddRecord", TABLE_AGENTS, null, {
                     [COL_AGENT_PRENOM]: payload.prenom,
                     [COL_AGENT_NOM]: payload.nom,
                     [COL_AGENT_FONCTION]: payload.fct,
-                    [COL_AGENT_STRUCT_REF]: payload.struct
+                    [COL_AGENT_STRUCT_REF]: payload.struct,
+                    "Formations": payload.form 
                 }]
             ]);
-            alert("✅ Agent ajouté !");
+            
+            alert("✅ Succès !");
             location.reload();
         } catch (err) {
-            alert("Erreur lors de l'enregistrement.");
+            console.error(err);
+            alert("Erreur de droits ou de colonnes. Vérifiez Grist.");
             btnSave.disabled = false;
+            btnSave.textContent = "Enregistrer dans Grist";
         }
     };
 }
 
-function fillStructureSelect(selectEl) {
-    const sorted = [...state.structures].sort((a, b) => 
-        safeStr(a[COL_STRUCT_LIBELLE]).localeCompare(safeStr(b[COL_STRUCT_LIBELLE]))
-    );
-    sorted.forEach(s => {
-        const opt = new Option(s[COL_STRUCT_LIBELLE], s.id);
-        selectEl.add(opt);
-    });
-}
-
-/**
- * ==========================================
- * HELPERS & CONFIG
- * ==========================================
- */
-function getStructuresByPos(code) {
-    return state.structures.filter(s => safeStr(s[COL_STRUCT_POSITION]) === code);
-}
-
-function applyLogoConfig(config) {
-    if (!config?.[0]) return;
-    const row = config[0];
-    const logo = document.querySelector('.fr-header__logo');
-    if (!logo) return;
-
-    if (row[COL_CONFIG_MASQUER_LOGO]) return logo.style.display = 'none';
-    const text = safeStr(row[COL_CONFIG_TEXTE_LOGO]);
-    if (text) {
-        const p = logo.querySelector('.fr-logo');
-        if (p) p.innerHTML = safeHtml(text).replace(/\n/g, '<br>');
+// Initialisation de la stratégie dès que le bouton "Nouvel Agent" existe
+const checkExist = setInterval(() => {
+    if (document.getElementById('btn-show-form')) {
+        setupAdminSystem();
+        clearInterval(checkExist);
     }
-}
-
-// Utilitaires de sécurité
-function safeStr(v) { return v ? String(v).trim() : ""; }
-function safeHtml(v, fallback = "") { 
-    if(!v) return fallback;
-    return String(v).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m])); 
-}
+}, 500);
