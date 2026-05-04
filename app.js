@@ -435,13 +435,20 @@ function remplirMenuStructures(listeDesStructures) {
     const select = document.getElementById('select-structure-form');
     if (!select) return;
 
-    // On vide le "Chargement..." et on met les vraies structures
     select.innerHTML = '<option value="">-- Choisir une structure --</option>';
     
     listeDesStructures.forEach(struct => {
         const option = document.createElement('option');
-        option.value = struct.id; // L'ID interne de Grist
-        option.textContent = (struct.Nom_de_la_structure || struct.Nom || "Structure sans nom").trim();
+        option.value = struct.id; 
+
+        // On teste plusieurs noms de colonnes possibles (Majuscules, underscores, etc.)
+        const nomAffiche = struct.Nom_de_la_structure || 
+                           struct.Nom || 
+                           struct.Structure || 
+                           struct.Libelle || 
+                           "Sans nom";
+
+        option.textContent = nomAffiche.trim(); 
         select.appendChild(option);
     });
 }
