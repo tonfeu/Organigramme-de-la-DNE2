@@ -461,29 +461,25 @@ document.addEventListener('submit', async (e) => {
         e.preventDefault();
         
         const formData = new FormData(e.target);
+        
+        // CORRECTION ICI : On utilise les noms exacts de ta table "Base_Agent"
         const nouvelAgent = {
-            Nom: formData.get('Nom'),
-            Prenom: formData.get('Prenom'),
-            // On récupère l'ID de la structure choisie dans le menu
-            Structure: parseInt(formData.get('Structure')) 
+            Nom_d_usage_de_l_agent: formData.get('Nom'), // Doit matcher ta table
+            Prenom: formData.get('Prenom'),              // Doit matcher ta table
+            Structure_de_l_agent: parseInt(formData.get('Structure')), // Reference
+            Fonction_de_l_agent: "Nouvel arrivant" // Valeur par défaut ou champ à ajouter au HTML
         };
 
         try {
-            // "Agents" doit être l'ID de ta table dans Grist[cite: 15]
-            await grist.docApi.applyRecords('Agents', [nouvelAgent]);
+            // Remplace 'Agents' par l'ID réel de ta table (probablement 'Base_Agent')
+            await grist.docApi.applyRecords('Base_Agent', [nouvelAgent]);
             alert("Agent ajouté avec succès !");
             
-            // Fermeture de la modale (Standard DSFR)[cite: 10]
-            const modal = document.getElementById('modal-ajout-agent');
-            if (window.dsfr && modal) {
-                window.dsfr(modal).modal.conceal();
-            }
-            
-            // On recharge la page pour voir le nouvel agent dans l'organigramme
+            // Fermeture et recharge
             window.location.reload();
         } catch (erreur) {
-            console.error("Erreur lors de l'ajout :", erreur);
-            alert("Erreur Grist : Vérifiez vos droits d'accès.");
+            console.error("Détail de l'erreur :", erreur);
+            alert("Erreur de colonnes : Vérifiez que les IDs dans le code correspondent à Grist.");
         }
     }
 });
