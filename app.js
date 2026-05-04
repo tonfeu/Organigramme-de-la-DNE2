@@ -13,64 +13,58 @@
 // Initialisation de la connexion avec Grist au chargement du script
 // 1. Initialisation de la configuration Grist
 // On demande l'accès complet dès le départ.
+// ==========================================
+// INITIALISATION ET GESTION DU FORMULAIRE
+// ==========================================
+
+// Initialisation unique de Grist
 grist.ready({
     requiredAccess: 'full'
 });
 
-// 2. Utilisation d'une fonction d'initialisation propre
-const initFormulaire = () => {
+// Fonction pour gérer l'ajout d'agent
+const setupAjoutAgent = () => {
     const form = document.getElementById('form-agent');
-    
-    if (!form) {
-        console.warn("Formulaire 'form-agent' non trouvé dans le DOM.");
-        return;
-    }
+    if (!form) return;
 
-    form.addEventListener('submit', async (e) => {
+    // On utilise un seul écouteur pour éviter les doublons
+    form.onsubmit = async (e) => {
         e.preventDefault();
-        
-        // Sécurité : Vérifier si l'API est prête au moment du clic
+
+        // Vérification de l'API d'écriture
         if (!grist.docApi || typeof grist.docApi.applyRecords !== 'function') {
-            alert("Connexion à Grist en cours... Réessayez dans un instant.");
+            alert("L'API Grist n'est pas encore prête. Attendez le chargement de l'organigramme.");
             return;
         }
 
-        const formData = new FormData(e.target);
+        const formData = new FormData(form);
         
-        // Construction de l'objet selon la structure de ta table 'Base_Agent'
+        // CORRECTION : On utilise les noms VRAIS de ta table Base_Agent
         const nouvelAgent = {
-            Nom_d_usage_de_l_agent: formData.get('Nom'), //
-            Prenom: formData.get('Prenom'),              //
-            Structure_de_l_agent: parseInt(formData.get('Structure')), // Reference (ID)
+            Nom_d_usage_de_l_agent: formData.get('Nom'),
+            Prenom: formData.get('Prenom'),
+            Structure_de_l_agent: parseInt(formData.get('Structure')),
             Fonction_de_l_agent: "Nouvel arrivant"
         };
 
         try {
-            console.log("Envoi des données à Grist...", nouvelAgent);
-            
-            // Appel à l'API Grist pour insérer l'enregistrement
+            console.log("Envoi à Grist...", nouvelAgent);
+            // Vérifie que 'Base_Agent' est bien l'ID de ta table
             await grist.docApi.applyRecords('Base_Agent', [nouvelAgent]);
-            
             alert("Agent ajouté avec succès !");
-            
-            // Rechargement pour mettre à jour l'organigramme immédiatement
-            window.location.reload(); 
+            window.location.reload();
         } catch (err) {
-            console.error("Erreur lors de l'application des records :", err);
-            alert("Échec de l'enregistrement. Vérifiez vos droits d'accès ou l'ID de la table.");
+            console.error("Erreur Grist :", err);
+            alert("Erreur : " + (err.message || "Vérifiez vos droits d'accès."));
         }
-    });
+    };
 };
 
-// 3. Lancement de l'initialisation quand le DOM est prêt
-if (document.readyState === 'complete' || document.readyState === 'interactive') {
-    initFormulaire();
-} else {
-    document.addEventListener('DOMContentLoaded', initFormulaire);
-}
-
-// Lancement de la fonction principale après chargement du DOM
-document.addEventListener('DOMContentLoaded', init);
+// On lance l'organigramme ET le formulaire
+document.addEventListener('DOMContentLoaded', () => {
+    init();           // Lance le rendu de l'organigramme
+    setupAjoutAgent(); // Lance la gestion du formulaire
+});
 
 // Variables globales (cache des données)
 let allAgents = [];              // Liste complète des agents
