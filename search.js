@@ -697,42 +697,45 @@ window.toggleAddForm = function() {
 };
 
 
-
 function setupStructureAutocomplete(structures) {
-    const searchInput = document.getElementById('structure-search');
-    const suggestionsContainer = document.getElementById('structure-suggestions');
-    const suggestionsList = document.getElementById('suggestions-list');
-    const hiddenIdInput = document.getElementById('agent-structure-id');
+    const input = document.getElementById('structure-search');
+    const container = document.getElementById('structure-suggestions');
+    const list = document.getElementById('suggestions-list');
+    const hiddenInput = document.getElementById('agent-structure-id');
 
-    searchInput.addEventListener('input', () => {
-        const query = searchInput.value.toLowerCase().trim();
-        suggestionsList.innerHTML = '';
-        
-        if (query.length < 1) {
-            suggestionsContainer.style.display = 'none';
-            return;
-        }
-
+    function updateList(filter = "") {
+        list.innerHTML = '';
         const matches = structures.filter(s => 
-            (s.Code_Bureau && s.Code_Bureau.toLowerCase().includes(query)) || 
-            (s.Libelle_Long && s.Libelle_Long.toLowerCase().includes(query))
+            s.Libelle_Long.toLowerCase().includes(filter.toLowerCase()) || 
+            s.Code_Bureau.toLowerCase().includes(filter.toLowerCase())
         );
 
         if (matches.length > 0) {
-            suggestionsContainer.style.display = 'block';
+            container.style.display = 'block';
             matches.forEach(s => {
                 const li = document.createElement('li');
-                li.innerHTML = `<button class="fr-nav__link" type="button" style="width:100%; text-align:left;">
-                                    <strong>${s.Code_Bureau}</strong> - ${s.Libelle_Long}
-                                </button>`;
-                li.onclick = (e) => {
-                    e.preventDefault();
-                    searchInput.value = `${s.Code_Bureau} - ${s.Libelle_Long}`;
-                    hiddenIdInput.value = s.id; 
-                    suggestionsContainer.style.display = 'none';
+                li.style.padding = "10px";
+                li.style.cursor = "pointer";
+                li.style.borderBottom = "1px solid #eee";
+                li.innerHTML = `<strong>${s.Code_Bureau}</strong> - ${s.Libelle_Long}`;
+                li.onmouseover = () => li.style.backgroundColor = "#f0f0f0";
+                li.onmouseout = () => li.style.backgroundColor = "white";
+                li.onclick = () => {
+                    input.value = `${s.Code_Bureau} - ${s.Libelle_Long}`;
+                    hiddenInput.value = s.id; // On stocke l'ID Grist[cite: 3]
+                    container.style.display = 'none';
                 };
-                suggestionsList.appendChild(li);
+                list.appendChild(li);
             });
         }
+    }
+
+    // Affiche tout au clic, filtre à la saisie
+    input.onclick = () => updateList(input.value);
+    input.oninput = () => updateList(input.value);
+
+    // Fermer si on clique ailleurs
+    document.addEventListener('click', (e) => {
+        if (!input.contains(e.target) && !container.contains(e.target)) container.style.display = 'none';
     });
 }
