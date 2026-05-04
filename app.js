@@ -11,12 +11,63 @@
 
 // Initialisation du plugin Grist avec accès en lecture
 // Initialisation de la connexion avec Grist au chargement du script
+// 1. Initialisation de la configuration Grist
+// On demande l'accès complet dès le départ.
 grist.ready({
-  requiredAccess: 'full', // Demande explicitement l'accès complet dès le départ
-  columns: [
-    { name: "Structure_de_l_agent", type: 'Reference' } // Optionnel : aide Grist à mapper les données
-  ]
+    requiredAccess: 'full'
 });
+
+// 2. Utilisation d'une fonction d'initialisation propre
+const initFormulaire = () => {
+    const form = document.getElementById('form-agent');
+    
+    if (!form) {
+        console.warn("Formulaire 'form-agent' non trouvé dans le DOM.");
+        return;
+    }
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        // Sécurité : Vérifier si l'API est prête au moment du clic
+        if (!grist.docApi || typeof grist.docApi.applyRecords !== 'function') {
+            alert("Connexion à Grist en cours... Réessayez dans un instant.");
+            return;
+        }
+
+        const formData = new FormData(e.target);
+        
+        // Construction de l'objet selon la structure de ta table 'Base_Agent'
+        const nouvelAgent = {
+            Nom_d_usage_de_l_agent: formData.get('Nom'), //
+            Prenom: formData.get('Prenom'),              //
+            Structure_de_l_agent: parseInt(formData.get('Structure')), // Reference (ID)
+            Fonction_de_l_agent: "Nouvel arrivant"
+        };
+
+        try {
+            console.log("Envoi des données à Grist...", nouvelAgent);
+            
+            // Appel à l'API Grist pour insérer l'enregistrement
+            await grist.docApi.applyRecords('Base_Agent', [nouvelAgent]);
+            
+            alert("Agent ajouté avec succès !");
+            
+            // Rechargement pour mettre à jour l'organigramme immédiatement
+            window.location.reload(); 
+        } catch (err) {
+            console.error("Erreur lors de l'application des records :", err);
+            alert("Échec de l'enregistrement. Vérifiez vos droits d'accès ou l'ID de la table.");
+        }
+    });
+};
+
+// 3. Lancement de l'initialisation quand le DOM est prêt
+if (document.readyState === 'complete' || document.readyState === 'interactive') {
+    initFormulaire();
+} else {
+    document.addEventListener('DOMContentLoaded', initFormulaire);
+}
 
 // Lancement de la fonction principale après chargement du DOM
 document.addEventListener('DOMContentLoaded', init);
@@ -452,36 +503,3 @@ function remplirMenuStructures(listeDesStructures) {
 // GESTION DE L'AJOUT D'AGENT
 // ==========================================
 // ==========================================
-// GESTION DE L'AJOUT D'AGENT (CORRIGÉE)
-// ==========================================
-document.addEventListener('submit', async (e) => {
-    if (e.target && e.target.id === 'form-agent') {
-        e.preventDefault();
-        
-        const formData = new FormData(e.target);
-        
-        const nouvelAgent = {
-            Nom_d_usage_de_l_agent: formData.get('Nom'),
-            Prenom: formData.get('Prenom'),
-            Structure_de_l_agent: parseInt(formData.get('Structure')),
-            Fonction_de_l_agent: "Nouvel arrivant"
-        };
-
-        try {
-            // Utilisation de grist.ready() pour garantir que docApi est chargé
-            await grist.ready(); 
-            
-            // On vérifie explicitement si la fonction existe avant de l'appeler
-            if (grist.docApi && typeof grist.docApi.applyRecords === 'function') {
-                await grist.docApi.applyRecords('Base_Agent', [nouvelAgent]);
-                alert("Agent ajouté avec succès !");
-                window.location.reload();
-            } else {
-                throw new Error("L'API Grist n'est pas encore prête pour l'écriture.");
-            }
-        } catch (erreur) {
-            console.error("Détail de l'erreur Grist :", erreur);
-            alert("Erreur technique : L'API Grist est mal initialisée.");
-        }
-    }
-});
