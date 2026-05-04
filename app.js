@@ -10,17 +10,12 @@
 // Note : Les constantes (noms de colonnes, tables, etc.) sont définies dans utils.js
 
 // Initialisation du plugin Grist avec accès en lecture
-grist.ready({ 
-  requiredAccess: 'full',
-  onRecords: function(records) {
-    // Cette fonction optionnelle peut aider à stabiliser la connexion
-    const structures = grist.getTable('Structures'); 
-    
-    // 2. On initialise le formulaire avec ces données
-    if (typeof initFullAgentForm === "function") {
-        initFullAgentForm(structures);
-    }
-  }
+// Initialisation de la connexion avec Grist au chargement du script
+grist.ready({
+  requiredAccess: 'full', // Demande explicitement l'accès complet dès le départ
+  columns: [
+    { name: "Structure_de_l_agent", type: 'Reference' } // Optionnel : aide Grist à mapper les données
+  ]
 });
 
 // Lancement de la fonction principale après chargement du DOM
