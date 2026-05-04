@@ -100,6 +100,7 @@ async function init() {
         renderTopZone();   // Zone supérieure (direction, cabinet...)
         renderColumns();   // Colonnes principales
         initQuickSearch(); // Recherche rapide
+        remplirMenuStructures(allStructures);
 
         // ==========================================
         // 5. EXPOSITION DES DONNÉES (POUR PDF / AUTRES MODULES)
@@ -198,6 +199,7 @@ function renderColumns() {
         const subs = getStructuresByPos(`COL${i}_SUB`);
         subs.forEach(sub => createDsfrTile(container, sub));
     }
+  
 }
 
 /**
@@ -428,3 +430,53 @@ function initQuickSearch() {
         }
     }
 }
+
+function remplirMenuStructures(listeDesStructures) {
+    const select = document.getElementById('select-structure-form');
+    if (!select) return;
+
+    // On vide le "Chargement..." et on met les vraies structures
+    select.innerHTML = '<option value="">-- Choisir une structure --</option>';
+    
+    listeDesStructures.forEach(struct => {
+        const option = document.createElement('option');
+        option.value = struct.id; // L'ID interne de Grist
+        option.textContent = struct.Nom_de_la_structure || struct.Nom; 
+        select.appendChild(option);
+    });
+}
+
+// ==========================================
+// GESTION DE L'AJOUT D'AGENT
+// ==========================================
+document.addEventListener('submit', async (e) => {
+    if (e.target && e.target.id === 'form-agent') {
+        e.preventDefault();
+        
+        const formData = new FormData(e.target);
+        const nouvelAgent = {
+            Nom: formData.get('Nom'),
+            Prenom: formData.get('Prenom'),
+            // On récupère l'ID de la structure choisie dans le menu
+            Structure: parseInt(formData.get('Structure')) 
+        };
+
+        try {
+            // "Agents" doit être l'ID de ta table dans Grist[cite: 15]
+            await grist.docApi.applyRecords('Agents', [nouvelAgent]);
+            alert("Agent ajouté avec succès !");
+            
+            // Fermeture de la modale (Standard DSFR)[cite: 10]
+            const modal = document.getElementById('modal-ajout-agent');
+            if (window.dsfr && modal) {
+                window.dsfr(modal).modal.conceal();
+            }
+            
+            // On recharge la page pour voir le nouvel agent dans l'organigramme
+            window.location.reload();
+        } catch (erreur) {
+            console.error("Erreur lors de l'ajout :", erreur);
+            alert("Erreur Grist : Vérifiez vos droits d'accès.");
+        }
+    }
+});

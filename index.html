@@ -84,7 +84,42 @@
     <!-- CONTENU PRINCIPAL -->
     <!-- ========================= -->
     <main class="fr-container fr-my-4w">
+<!-- 1. Le bouton pour ouvrir le formulaire -->
+<button class="fr-btn fr-ml-2w" data-fr-opened="false" aria-controls="modal-ajout-agent">
+    + Ajouter un agent
+</button>
 
+<!-- 2. La fenêtre qui s'ouvre (Modale) -->
+<dialog id="modal-ajout-agent" class="fr-modal" role="dialog">
+    <div class="fr-container">
+        <div class="fr-modal__body">
+            <div class="fr-modal__header">
+                <button class="fr-link--close fr-link" aria-controls="modal-ajout-agent">Fermer</button>
+            </div>
+            <div class="fr-modal__content">
+                <h1 class="fr-modal__title">Nouvel Agent</h1>
+                <form id="form-agent">
+                    <div class="fr-input-group">
+                        <label class="fr-label">Nom</label>
+                        <input class="fr-input" type="text" name="Nom" required>
+                    </div>
+                    <div class="fr-input-group">
+                        <label class="fr-label">Prénom</label>
+                        <input class="fr-input" type="text" name="Prenom" required>
+                    </div>
+                    <div class="fr-input-group">
+                        <label class="fr-label">Structure</label>
+                        <!-- C'est ce menu qu'on va remplir avec JS -->
+                        <select class="fr-select" id="select-structure-form" name="Structure" required>
+                            <option value="">Chargement...</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="fr-btn fr-mt-2w">Enregistrer dans Grist</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</dialog>
         <!-- ========================================= -->
         <!-- 1. BARRE DE RECHERCHE (MODE ACCORDÉON) -->
         <!-- ========================================= -->
