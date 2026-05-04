@@ -457,7 +457,7 @@ function remplirMenuStructures(listeDesStructures) {
 // GESTION DE L'AJOUT D'AGENT
 // ==========================================
 // ==========================================
-// GESTION DE L'AJOUT D'AGENT
+// GESTION DE L'AJOUT D'AGENT (CORRIGÉE)
 // ==========================================
 document.addEventListener('submit', async (e) => {
     if (e.target && e.target.id === 'form-agent') {
@@ -465,27 +465,28 @@ document.addEventListener('submit', async (e) => {
         
         const formData = new FormData(e.target);
         
-        // On prépare l'objet avec les noms de colonnes VITAULX de ta table Base_Agent
         const nouvelAgent = {
-            Nom_d_usage_de_l_agent: formData.get('Nom'), // Correspond à la colonne Grist
-            Prenom: formData.get('Prenom'),              // Correspond à la colonne Grist
-            Structure_de_l_agent: parseInt(formData.get('Structure')), // Reference (ID numérique)
-            Fonction_de_l_agent: "Nouvel arrivant"       // Valeur par défaut pour éviter le vide
+            Nom_d_usage_de_l_agent: formData.get('Nom'),
+            Prenom: formData.get('Prenom'),
+            Structure_de_l_agent: parseInt(formData.get('Structure')),
+            Fonction_de_l_agent: "Nouvel arrivant"
         };
 
-        console.log("Tentative d'envoi vers Grist :", nouvelAgent);
-
         try {
-            // "Base_Agent" doit être l'ID exact de ta table dans Grist
-            await grist.docApi.applyRecords('Base_Agent', [nouvelAgent]);
-            alert("Agent ajouté avec succès !");
+            // Utilisation de grist.ready() pour garantir que docApi est chargé
+            await grist.ready(); 
             
-            // Fermeture de la modale et recharge de la page
-            window.location.reload();
+            // On vérifie explicitement si la fonction existe avant de l'appeler
+            if (grist.docApi && typeof grist.docApi.applyRecords === 'function') {
+                await grist.docApi.applyRecords('Base_Agent', [nouvelAgent]);
+                alert("Agent ajouté avec succès !");
+                window.location.reload();
+            } else {
+                throw new Error("L'API Grist n'est pas encore prête pour l'écriture.");
+            }
         } catch (erreur) {
             console.error("Détail de l'erreur Grist :", erreur);
-            // Si l'erreur persiste, le message ci-dessous s'affichera
-            alert("Erreur : Vérifiez que 'Base_Agent' est bien l'ID de votre table dans les paramètres Grist.");
+            alert("Erreur technique : L'API Grist est mal initialisée.");
         }
     }
 });
