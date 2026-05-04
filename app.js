@@ -18,52 +18,62 @@
 // ==========================================
 
 // Initialisation unique de Grist
-grist.ready({
-    requiredAccess: 'full'
+// 1. Demande d'accès
+grist.ready({ requiredAccess: 'full' });
+
+// 2. Initialisation globale
+let allAgents = [];
+let allStructures = [];
+
+// 3. Cette fonction ne s'exécute QUE quand Grist confirme que les données sont là
+grist.onRecords((records) => {
+    console.log("Données reçues et API prête.");
+    // On peut appeler init() ici si on veut rafraîchir à chaque changement
 });
 
-// Fonction pour gérer l'ajout d'agent
-const setupAjoutAgent = () => {
+// 4. Gestion sécurisée du formulaire
+const setupFormulaire = () => {
     const form = document.getElementById('form-agent');
     if (!form) return;
 
-    // On utilise un seul écouteur pour éviter les doublons
     form.onsubmit = async (e) => {
         e.preventDefault();
 
-        // Vérification de l'API d'écriture
-        if (!grist.docApi || typeof grist.docApi.applyRecords !== 'function') {
-            alert("L'API Grist n'est pas encore prête. Attendez le chargement de l'organigramme.");
+        // Vérification ultime de l'API
+        if (!grist.docApi || !grist.docApi.applyRecords) {
+            alert("L'API d'écriture n'est pas encore activée par Grist. Vérifiez la bannière orange en haut de la page.");
             return;
         }
 
         const formData = new FormData(form);
-        
-        // CORRECTION : On utilise les noms VRAIS de ta table Base_Agent
+        const structureId = parseInt(formData.get('Structure'));
+
+        if (isNaN(structureId)) {
+            alert("Veuillez choisir une structure valide.");
+            return;
+        }
+
         const nouvelAgent = {
             Nom_d_usage_de_l_agent: formData.get('Nom'),
             Prenom: formData.get('Prenom'),
-            Structure_de_l_agent: parseInt(formData.get('Structure')),
+            Structure_de_l_agent: structureId,
             Fonction_de_l_agent: "Nouvel arrivant"
         };
 
         try {
-            console.log("Envoi à Grist...", nouvelAgent);
-            // Vérifie que 'Base_Agent' est bien l'ID de ta table
             await grist.docApi.applyRecords('Base_Agent', [nouvelAgent]);
-            alert("Agent ajouté avec succès !");
+            alert("Agent ajouté !");
             window.location.reload();
         } catch (err) {
-            console.error("Erreur Grist :", err);
-            alert("Erreur : " + (err.message || "Vérifiez vos droits d'accès."));
+            console.error("Échec Grist:", err);
+            alert("Erreur : " + err.message);
         }
     };
 };
 
-// On lance l'organigramme ET le formulaire
 document.addEventListener('DOMContentLoaded', () => {
-    init();           // Lance le rendu de l'organigramme
-    setupAjoutAgent(); // Lance la gestion du formulaire
+    init(); // Ta fonction de chargement actuelle
+    setupFormulaire();
 });
 
 // Variables globales (cache des données)
