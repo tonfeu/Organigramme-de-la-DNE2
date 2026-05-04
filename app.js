@@ -422,5 +422,3 @@ function initQuickSearch() {
         }
     }
 }
-
-
