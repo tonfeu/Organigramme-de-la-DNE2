@@ -441,7 +441,7 @@ function remplirMenuStructures(listeDesStructures) {
     listeDesStructures.forEach(struct => {
         const option = document.createElement('option');
         option.value = struct.id; // L'ID interne de Grist
-        option.textContent = struct.Nom_de_la_structure || struct.Nom; 
+        option.textContent = (struct.Nom_de_la_structure || struct.Nom || "Structure sans nom").trim();
         select.appendChild(option);
     });
 }
