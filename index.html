@@ -84,43 +84,7 @@
     <!-- CONTENU PRINCIPAL -->
     <!-- ========================= -->
     <main class="fr-container fr-my-4w">
-<section class="fr-container fr-my-6w">
-    <div class="fr-grid-row fr-grid-row--center">
-        <div class="fr-col-12 fr-col-md-8">
-            <div class="fr-card fr-p-4w" style="background-color: var(--background-alt-blue-france); border: 1px solid #e5e5e5;">
-                <h2 class="fr-h4">➕ Ajouter un nouvel agent</h2>
-                <form id="add-agent-form">
-                    <div class="fr-grid-row fr-grid-row--gutters">
-                        <div class="fr-col-12 fr-col-md-6 fr-input-group">
-                            <label class="fr-label" for="agent-nom">Nom</label>
-                            <input class="fr-input" type="text" id="agent-nom" name="Nom" required>
-                        </div>
-                        <div class="fr-col-12 fr-col-md-6 fr-input-group">
-                            <label class="fr-label" for="agent-prenom">Prénom</label>
-                            <input class="fr-input" type="text" id="agent-prenom" name="Prenom" required>
-                        </div>
-                        
-                        <!-- FILTRE DE STRUCTURE AMÉLIORÉ -->
-                        <div class="fr-col-12 fr-input-group" style="position: relative;">
-                            <label class="fr-label" for="structure-search">Structure de rattachement</label>
-                            <div class="fr-input-wrap fr-fi-search-line">
-                                <input class="fr-input" type="text" id="structure-search" placeholder="Cliquez ou tapez (ex: SDSI, B1...)" autocomplete="off">
-                            </div>
-                            <!-- L'ID stocké pour Grist -->
-                            <input type="hidden" id="agent-structure-id" name="ID_Structure" required>
-                            
-                            <!-- Liste déroulante -->
-                            <div id="structure-suggestions" style="display: none; position: absolute; z-index: 1000; width: 100%; background: white; border: 1px solid #ccc; box-shadow: 0 4px 10px rgba(0,0,0,0.2); max-height: 250px; overflow-y: auto;">
-                                <ul id="suggestions-list" style="list-style: none; padding: 0; margin: 0;"></ul>
-                            </div>
-                        </div>
-                    </div>
-                    <button type="submit" class="fr-btn fr-mt-3w">Enregistrer l'agent[cite: 7]</button>
-                </form>
-            </div>
-        </div>
-    </div>
-</section>
+
         <!-- ========================================= -->
         <!-- 1. BARRE DE RECHERCHE (MODE ACCORDÉON) -->
         <!-- ========================================= -->
