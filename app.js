@@ -456,30 +456,36 @@ function remplirMenuStructures(listeDesStructures) {
 // ==========================================
 // GESTION DE L'AJOUT D'AGENT
 // ==========================================
+// ==========================================
+// GESTION DE L'AJOUT D'AGENT
+// ==========================================
 document.addEventListener('submit', async (e) => {
     if (e.target && e.target.id === 'form-agent') {
         e.preventDefault();
         
         const formData = new FormData(e.target);
         
-        // CORRECTION ICI : On utilise les noms exacts de ta table "Base_Agent"
+        // On prépare l'objet avec les noms de colonnes VITAULX de ta table Base_Agent
         const nouvelAgent = {
-            Nom_d_usage_de_l_agent: formData.get('Nom'), // Doit matcher ta table
-            Prenom: formData.get('Prenom'),              // Doit matcher ta table
-            Structure_de_l_agent: parseInt(formData.get('Structure')), // Reference
-            Fonction_de_l_agent: "Nouvel arrivant" // Valeur par défaut ou champ à ajouter au HTML
+            Nom_d_usage_de_l_agent: formData.get('Nom'), // Correspond à la colonne Grist
+            Prenom: formData.get('Prenom'),              // Correspond à la colonne Grist
+            Structure_de_l_agent: parseInt(formData.get('Structure')), // Reference (ID numérique)
+            Fonction_de_l_agent: "Nouvel arrivant"       // Valeur par défaut pour éviter le vide
         };
 
+        console.log("Tentative d'envoi vers Grist :", nouvelAgent);
+
         try {
-            // Remplace 'Agents' par l'ID réel de ta table (probablement 'Base_Agent')
+            // "Base_Agent" doit être l'ID exact de ta table dans Grist
             await grist.docApi.applyRecords('Base_Agent', [nouvelAgent]);
             alert("Agent ajouté avec succès !");
             
-            // Fermeture et recharge
+            // Fermeture de la modale et recharge de la page
             window.location.reload();
         } catch (erreur) {
-            console.error("Détail de l'erreur :", erreur);
-            alert("Erreur de colonnes : Vérifiez que les IDs dans le code correspondent à Grist.");
+            console.error("Détail de l'erreur Grist :", erreur);
+            // Si l'erreur persiste, le message ci-dessous s'affichera
+            alert("Erreur : Vérifiez que 'Base_Agent' est bien l'ID de votre table dans les paramètres Grist.");
         }
     }
 });
