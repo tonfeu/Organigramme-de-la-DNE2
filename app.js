@@ -13,68 +13,64 @@
 // Initialisation de la connexion avec Grist au chargement du script
 // 1. Initialisation de la configuration Grist
 // On demande l'accès complet dès le départ.
-// ==========================================
-// INITIALISATION ET GESTION DU FORMULAIRE
-// ==========================================
-
-// Initialisation unique de Grist
-// 1. Demande d'accès
-grist.ready({ requiredAccess: 'full' });
-
-// 2. Initialisation globale
-let allAgents = [];
-let allStructures = [];
-
-// 3. Cette fonction ne s'exécute QUE quand Grist confirme que les données sont là
-grist.onRecords((records) => {
-    console.log("Données reçues et API prête.");
-    // On peut appeler init() ici si on veut rafraîchir à chaque changement
+grist.ready({
+    requiredAccess: 'full'
 });
 
-// 4. Gestion sécurisée du formulaire
-const setupFormulaire = () => {
+// 2. Utilisation d'une fonction d'initialisation propre
+const initFormulaire = () => {
     const form = document.getElementById('form-agent');
-    if (!form) return;
+    
+    if (!form) {
+        console.warn("Formulaire 'form-agent' non trouvé dans le DOM.");
+        return;
+    }
 
-    form.onsubmit = async (e) => {
+    form.addEventListener('submit', async (e) => {
         e.preventDefault();
-
-        // Vérification ultime de l'API
-        if (!grist.docApi || !grist.docApi.applyRecords) {
-            alert("L'API d'écriture n'est pas encore activée par Grist. Vérifiez la bannière orange en haut de la page.");
+        
+        // Sécurité : Vérifier si l'API est prête au moment du clic
+        if (!grist.docApi || typeof grist.docApi.applyRecords !== 'function') {
+            alert("Connexion à Grist en cours... Réessayez dans un instant.");
             return;
         }
 
-        const formData = new FormData(form);
-        const structureId = parseInt(formData.get('Structure'));
-
-        if (isNaN(structureId)) {
-            alert("Veuillez choisir une structure valide.");
-            return;
-        }
-
+        const formData = new FormData(e.target);
+        
+        // Construction de l'objet selon la structure de ta table 'Base_Agent'
         const nouvelAgent = {
-            Nom_d_usage_de_l_agent: formData.get('Nom'),
-            Prenom: formData.get('Prenom'),
-            Structure_de_l_agent: structureId,
+            Nom_d_usage_de_l_agent: formData.get('Nom'), //
+            Prenom: formData.get('Prenom'),              //
+            Structure_de_l_agent: parseInt(formData.get('Structure')), // Reference (ID)
             Fonction_de_l_agent: "Nouvel arrivant"
         };
 
         try {
+            console.log("Envoi des données à Grist...", nouvelAgent);
+            
+            // Appel à l'API Grist pour insérer l'enregistrement
             await grist.docApi.applyRecords('Base_Agent', [nouvelAgent]);
-            alert("Agent ajouté !");
-            window.location.reload();
+            
+            alert("Agent ajouté avec succès !");
+            
+            // Rechargement pour mettre à jour l'organigramme immédiatement
+            window.location.reload(); 
         } catch (err) {
-            console.error("Échec Grist:", err);
-            alert("Erreur : " + err.message);
+            console.error("Erreur lors de l'application des records :", err);
+            alert("Échec de l'enregistrement. Vérifiez vos droits d'accès ou l'ID de la table.");
         }
-    };
+    });
 };
 
-document.addEventListener('DOMContentLoaded', () => {
-    init(); // Ta fonction de chargement actuelle
-    setupFormulaire();
-});
+// 3. Lancement de l'initialisation quand le DOM est prêt
+if (document.readyState === 'complete' || document.readyState === 'interactive') {
+    initFormulaire();
+} else {
+    document.addEventListener('DOMContentLoaded', initFormulaire);
+}
+
+// Lancement de la fonction principale après chargement du DOM
+document.addEventListener('DOMContentLoaded', init);
 
 // Variables globales (cache des données)
 let allAgents = [];              // Liste complète des agents
