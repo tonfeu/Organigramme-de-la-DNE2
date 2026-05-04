@@ -15,7 +15,11 @@ grist.ready({
   onRecords: function(records) {
     // Cette fonction optionnelle peut aider à stabiliser la connexion
     const structures = grist.getTable('Structures'); 
-    initFullAgentForm(structures);
+    
+    // 2. On initialise le formulaire avec ces données
+    if (typeof initFullAgentForm === "function") {
+        initFullAgentForm(structures);
+    }
   }
 });
 
