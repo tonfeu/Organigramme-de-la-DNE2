@@ -585,7 +585,7 @@ window.executeTransfer = async function(agentId, uniqueId, agentName) {
     try {
         await grist.docApi.applyUserActions([
             ["UpdateRecord", TABLE_AGENTS, agentId, {
-                [COL_STRUCT_LIBELLE]: newStructureId 
+                [COL_AGENT_STRUCT_REF]: newStructureId 
             }]
         ]);
 
@@ -593,7 +593,7 @@ window.executeTransfer = async function(agentId, uniqueId, agentName) {
         
         // Mise à jour locale pour éviter de tout recharger
         const agent = allAgents.find(a => a.id === agentId);
-        if (agent) agent[COL_STRUCT_LIBELLE] = newStructureId;
+        if (agent) agent[COL_AGENT_STRUCT_REF] = newStructureId;
         
         performSearch(); // Rafraîchit l'affichage
     } catch (error) {
@@ -636,7 +636,7 @@ window.executeTransfer = async function(agentId, uniqueId, agentName) {
     try {
         await grist.docApi.applyUserActions([
             ["UpdateRecord", TABLE_AGENTS, agentId, {
-                [COL_STRUCT_LIBELLE]: newStructureId 
+                [COL_AGENT_STRUCT_REF]: newStructureId 
             }]
         ]);
 

@@ -422,3 +422,54 @@ function initQuickSearch() {
         }
     }
 }
+
+/**
+ * Initialise le formulaire d'ajout d'agent
+ * @param {Array} structures - Liste des structures issues de Grist[cite: 1]
+ */
+function initAddAgentForm(structures) {
+    const selectStructure = document.getElementById('agent-structure');
+    const form = document.getElementById('add-agent-form');
+
+    // Remplissage du filtre/sélecteur de structures
+    structures.forEach(struct => {
+        const option = document.createElement('option');
+        option.value = struct.id; // L'ID de la ligne dans Grist[cite: 3]
+        option.textContent = `${struct.Code_Bureau} - ${struct.Libelle_Long}`;[cite: 1, 8]
+        selectStructure.appendChild(option);
+    });
+
+    // Gestion de la soumission
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const formData = new FormData(form);
+        const newAgent = Object.fromEntries(formData.entries());
+
+        try {
+            // Appel à l'API Grist pour ajouter l'enregistrement dans Base_Agent[cite: 7]
+            await grist.docApi.addRecords('Base_Agent', [{
+                fields: {
+                    ...newAgent,
+                    // Conversion de l'ID structure en référence Grist si nécessaire
+                    ID_Structure: parseInt(newAgent.ID_Structure) 
+                }
+            }]);
+            
+            alert('Agent ajouté avec succès !');
+            form.reset();
+        } catch (error) {
+            console.error("Erreur lors de l'ajout :", error);
+            alert("Erreur lors de l'enregistrement.");
+        }
+    });
+}
+
+// Appel de la fonction dans votre bloc grist.ready()
+grist.ready(function() {
+    // Une fois les données chargées
+    grist.onRecords(function(records, mappings) {
+        // Supposons que vous ayez accès à la liste des structures
+        const structures = grist.getTable('Structures'); // Selon votre config[cite: 1]
+        initAddAgentForm(structures);
+    });
+});
