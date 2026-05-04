@@ -85,7 +85,80 @@
     <!-- ========================= -->
     <main class="fr-container fr-my-4w">
 
+<!-- Formulaire d'ajout d'agent - Design System de l'État -->
+<section class="fr-container fr-my-6w">
+    <div class="fr-grid-row fr-grid-row--center">
+        <div class="fr-col-12 fr-col-md-10 fr-col-lg-8">
+            <div class="fr-card fr-card--no-border fr-p-4w" style="background-color: var(--background-alt-blue-france);">
+                <h2 class="fr-h4 fr-fi-user-add-line fr-fi--before"> Ajouter un nouvel agent</h2>
+                
+                <form id="add-agent-form">
+                    <div class="fr-grid-row fr-grid-row--gutters">
+                        <!-- Identité -->
+                        <div class="fr-col-12 fr-col-md-6 fr-input-group">
+                            <label class="fr-label" for="agent-nom">Nom</label>
+                            <input class="fr-input" type="text" id="agent-nom" name="Nom" required>
+                        </div>
+                        <div class="fr-col-12 fr-col-md-6 fr-input-group">
+                            <label class="fr-label" for="agent-prenom">Prénom</label>
+                            <input class="fr-input" type="text" id="agent-prenom" name="Prenom" required>
+                        </div>
 
+                        <!-- Poste -->
+                        <div class="fr-col-12 fr-input-group">
+                            <label class="fr-label" for="agent-fonction">Fonction / Missions</label>
+                            <textarea class="fr-input" id="agent-fonction" name="Fonction" rows="2"></textarea>
+                        </div>
+
+                        <!-- Contact -->
+                        <div class="fr-col-12 fr-col-md-6 fr-input-group">
+                            <label class="fr-label" for="agent-email">Email professionnel</label>
+                            <input class="fr-input" type="email" id="agent-email" name="Email">
+                        </div>
+                        <div class="fr-col-12 fr-col-md-6 fr-input-group">
+                            <label class="fr-label" for="agent-tel">Téléphone</label>
+                            <input class="fr-input" type="tel" id="agent-tel" name="Telephone_Fixe">
+                        </div>
+
+                        <!-- STRUCTURE AVEC AUTOCOMPLÉTION (UX AMÉLIORÉE) -->
+                        <div class="fr-col-12 fr-input-group" style="position: relative;">
+                            <label class="fr-label" for="structure-search">
+                                Structure de rattachement
+                                <span class="fr-hint-text">Recherchez le bureau par nom ou code (ex: B1, SDSI...)</span>
+                            </label>
+                            <div class="fr-input-wrap fr-fi-search-line">
+                                <input class="fr-input" type="text" id="structure-search" placeholder="Commencez à taper..." autocomplete="off">
+                            </div>
+                            
+                            <!-- Champ caché pour l'ID Grist -->
+                            <input type="hidden" id="agent-structure-id" name="ID_Structure" required>
+                            
+                            <!-- Liste de suggestions -->
+                            <div id="structure-suggestions" class="fr-menu" 
+                                 style="display: none; position: absolute; z-index: 1000; width: 100%; background: white; border: 1px solid #e5e5e5; box-shadow: 0 4px 12px rgba(0,0,0,0.1); max-height: 200px; overflow-y: auto;">
+                                <ul class="fr-menu__list" id="suggestions-list"></ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="fr-mt-4w fr-grid-row fr-grid-row--right">
+                        <button type="submit" class="fr-btn fr-fi-check-line fr-btn--icon-left">
+                            Enregistrer l'agent[cite: 7]
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</section>
+
+<style>
+    #suggestions-list .fr-nav__link {
+        width: 100%; text-align: left; border: none; background: none; cursor: pointer; padding: 0.75rem;
+    }
+    #suggestions-list .fr-nav__link:hover { background-color: #f6f6f6; }
+    #suggestions-list li { border-bottom: 1px solid #eee; }
+</style>
         
         <!-- ========================================= -->
         <!-- 1. BARRE DE RECHERCHE (MODE ACCORDÉON) -->

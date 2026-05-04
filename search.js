@@ -695,3 +695,71 @@ window.toggleAddForm = function() {
     const form = document.getElementById('add-agent-form');
     form.style.display = (form.style.display === 'none') ? 'block' : 'none';
 };
+
+
+
+/**
+ * Initialise le formulaire et l'autocomplétion
+ */
+function initFullAgentForm(structures) {
+    const form = document.getElementById('add-agent-form');
+    const searchInput = document.getElementById('structure-search');
+    const suggestionsList = document.getElementById('suggestions-list');
+    const suggestionsContainer = document.getElementById('structure-suggestions');
+    const hiddenIdInput = document.getElementById('agent-structure-id');
+
+    // 1. Gestion de l'autocomplétion
+    searchInput.addEventListener('input', () => {
+        const val = searchInput.value.toLowerCase().trim();
+        suggestionsList.innerHTML = '';
+        if (val.length < 1) { suggestionsContainer.style.display = 'none'; return; }
+
+        const matches = structures.filter(s => 
+            s.Libelle_Long.toLowerCase().includes(val) || s.Code_Bureau.toLowerCase().includes(val)
+        );
+
+        if (matches.length > 0) {
+            suggestionsContainer.style.display = 'block';
+            matches.forEach(s => {
+                const li = document.createElement('li');
+                li.innerHTML = `<button class="fr-nav__link" type="button"><strong>${s.Code_Bureau}</strong> - ${s.Libelle_Long}</button>`;
+                li.onclick = () => {
+                    searchInput.value = `${s.Code_Bureau} - ${s.Libelle_Long}`;
+                    hiddenIdInput.value = s.id;
+                    suggestionsContainer.style.display = 'none';
+                };
+                suggestionsList.appendChild(li);
+            });
+        }
+    });
+
+    // 2. Envoi des données à Grist[cite: 1, 7]
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const formData = new FormData(form);
+        const data = Object.fromEntries(formData.entries());
+
+        try {
+            await grist.docApi.addRecords('Base_Agent', [{
+                fields: {
+                    Nom: data.Nom,
+                    Prenom: data.Prenom,
+                    Fonction: data.Fonction,
+                    Email: data.Email,
+                    Telephone_Fixe: data.Telephone_Fixe,
+                    ID_Structure: parseInt(data.ID_Structure) // Lien vers table Structures
+                }
+            }]);
+            alert("L'agent a été ajouté avec succès !");
+            form.reset();
+        } catch (err) {
+            console.error(err);
+            alert("Erreur lors de l'ajout.");
+        }
+    });
+
+    // Fermer si clic extérieur
+    document.addEventListener('click', (e) => {
+        if (!searchInput.contains(e.target)) suggestionsContainer.style.display = 'none';
+    });
+}

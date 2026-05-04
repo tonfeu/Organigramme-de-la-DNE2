@@ -14,6 +14,8 @@ grist.ready({
   requiredAccess: 'full',
   onRecords: function(records) {
     // Cette fonction optionnelle peut aider à stabiliser la connexion
+    const structures = grist.getTable('Structures'); 
+    initFullAgentForm(structures);
   }
 });
 
